@@ -7,6 +7,12 @@ bin-release/
 # Other files and folders
 .settings/
 
+# Data files
+N-CMAPSS/
+*.h5
+*.npy
+*.npz
+
 # Executables
 *.swf
 *.air

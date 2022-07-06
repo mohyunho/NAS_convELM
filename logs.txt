@@ -1,0 +1,53 @@
+python3 inference_mlp.py -w 1 -s 1 -bs 512 -ep 60 -pt 10 -vs 0.1 -lr 0.001 -sub 1
+
+----------
+python3 inference_cnnlstm.py -w 50 -s 50 -f 3 -k 3 -bs 128 -ep 40 -pt 10 -lr 0.0001 -vs 0.1 -sub 1 -s_stride 1 -s_len 30 -n_conv 1 -lstm1 10 -lstm2 5
+
+
+-----------------
+
+python3 inference_cnn_aggr.py -w 50 -s 1 -f 20 -k 10 -bs 1024 -ep 30 -pt 5 -vs 0.1 -lr 0.001 -sub 1
+
+python3 inference_cnn_aggr.py -w 50 -s 1 -f 10 -k 10 -bs 1024 -ep 30 -pt 5 -vs 0.1 -lr 0.001 -sub 1
+
+python3 inference_lstm_aggr.py -w 50 -s 1 -f 10 -k 10 -bs 1024 -ep 30 -pt 5 -vs 0.1 -lr 0.001 -sub 1 -l1 200 -l2 100 
+
+python3 -W ignore enas_elm.py -w 1 -s 1 -vs 0.2 --pop 1 --gen 1
+
+python3 -W ignore enas_elm.py -w 1 -s 1 -vs 0.2 --pop 3 --gen 3 -bs 50000
+
+python3 -W ignore enas_elm.py -w 1 -s 1 -vs 0.2 -constant 0.0001 --pop 2 --gen 2 -bs 50000
+
+python3 -W ignore enas_elm.py -w 1 -s 1 -vs 0.2 -constant 0.0001 --pop 30 --gen 30 -bs 50000
+
+python3 -W ignore enas_elm.py -w 1 -s 1 -vs 0.2 -constant 0.0001 --pop 20 --gen 20 -bs 50000
+
+python3 -W ignore enas_elm_moo.py -w 1 -s 1 -vs 0.2 -constant 0.0001 --pop 8 --gen 10 -bs 50000 --obj "moo"
+
+.settings/
+python3 -W ignore elm_test.py -w 1 -s 1 -vs 0.2 -constant 0.0001 --pop 28 --gen 30 -bs 50000 --obj "moo"
+
+
+python3 -W ignore enas_elm_moo.py -w 1 -s 1 -vs 0.2 -constant 0.0001 --pop 32 --gen 30 -bs 50000 --obj "moo"
+
+python3 -W ignore enas_elm_moo.py -w 1 -s 1 -vs 0.2 -constant 0.0001 --pop 28 --gen 30 -bs 50000 --obj "moo"
+
+python3 elm_params_time.py -w 1 -s 1 -vs 0.2 -constant 0.0001 -bs 50000
+
+
+python3 -W ignore enas_elm_moo.py -w 1 -s 1 -vs 0.2 -constant 0.0001 --pop 28 --gen 30 -bs 50000 --obj "moo" -t 1
+
+python3 -W ignore enas_elm.py -w 1 -s 1 -vs 0.2 -constant 0.0001 --pop 30 --gen 30 -bs 50000 --obj "soo" -t 2
+
+
+python3 -W ignore elm_test_multi.py -w 1 -s 1 -vs 0.2 -constant 0.0001 --pop 28 --gen 30 -bs 50000 --obj "moo"
+
+python3 inference_mlp.py -w 50 -s 50 -bs 128 -ep 30 -pt 5 -vs 0.2 -lr 0.001 -sub 1 --sampling 10
+
+
+
+
+------------------------------------
+#####################################
+
+python3 -W ignore enas_convELM.py -w 1 -s 1 -vs 0.2 -constant 0.0001 --pop 30 --gen 30 -bs 50000 --obj "soo" -t 0
