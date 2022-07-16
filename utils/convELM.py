@@ -76,6 +76,7 @@ class Net(nn.Module):
         num_features = 1
         for s in size:
             num_features *= s
+        print ("num_features", num_features)
         return num_features
 
 model = Net()
@@ -109,6 +110,18 @@ def train():
         correct, len(train_loader.dataset),
         100. * correct / len(train_loader.dataset)))
         '''
+
+    model.eval()
+    for batch_idx, (data, target) in enumerate(train_loader):
+        if args.cuda:
+            data, target = data.cuda(), target.cuda()
+        data, target = Variable(data), Variable(target)
+        output = model.forward(data)
+        pred = output.data.max(1)[1]
+        correct += pred.eq(target.data).cpu().sum()
+    ending = time.time()
+    
+    return correct
 
 def train_someBatch(batchidx=0):
     init = time.time()

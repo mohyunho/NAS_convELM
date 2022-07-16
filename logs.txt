@@ -50,4 +50,12 @@ python3 inference_mlp.py -w 50 -s 50 -bs 128 -ep 30 -pt 5 -vs 0.2 -lr 0.001 -sub
 ------------------------------------
 #####################################
 
-python3 -W ignore enas_convELM.py -w 1 -s 1 -vs 0.2 -constant 0.0001 --pop 30 --gen 30 -bs 50000 --obj "soo" -t 0
+python3 -W ignore enas_convELM.py -w 50 -s 1 -vs 0.2 --pop 20 --gen 20 -bs 1024 --obj "soo" -t 0
+
+python3 -W ignore enas_convELM.py -w 50 -s 50 -vs 0.2 --pop 20 --gen 20 -bs 5012 --obj "soo" -t 2
+
+python3 fitness_curve.py --pop 30 --gen 30 --obj "soo"
+
+python3 -W ignore inference_convELM_manual.py -w 50 -s 50 -vs 0.2 --pop 20 --gen 20 -bs 1024 --obj "soo" -t 0
+
+python3 -W ignore inference_convELM_manual.py -w 50 -s 50 -vs 0.2 --pop 30 --gen 30 -bs 1024 --obj "soo" -t 0

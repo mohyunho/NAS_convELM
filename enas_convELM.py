@@ -33,22 +33,21 @@ from math import sqrt
 from utils.elm_network import network_fit
 
 from utils.hpelm import ELM, HPELM
-from utils.elm_task import SimpleNeuroEvolutionTask
+from utils.convELM_task import SimpleNeuroEvolutionTask
 from utils.ea_multi import GeneticAlgorithm
 
+import torch
 
 # random seed predictable
 jobs = 1
-
-
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 data_filedir = os.path.join(current_dir, 'N-CMAPSS')
 data_filepath = os.path.join(current_dir, 'N-CMAPSS', 'N-CMAPSS_DS02-006.h5')
 sample_dir_path = os.path.join(data_filedir, 'Samples_whole')
 
-model_temp_path = os.path.join(current_dir, 'Models', 'elm_rep.h5')
-tf_temp_path = os.path.join(current_dir, 'TF_Model_tf')
+model_temp_path = os.path.join(current_dir, 'Models', 'convELM_rep.h5')
+torch_temp_path = os.path.join(current_dir, 'torch_model')
 
 pic_dir = os.path.join(current_dir, 'Figures')
 
@@ -63,9 +62,56 @@ if not os.path.exists(pic_dir):
 if not os.path.exists(directory_path):
     os.makedirs(directory_path)    
 
+
 '''
 load array from npz files
 '''
+
+def array_tensorlst_data (arry, bs):
+    # arry = arry.reshape(arry.shape[0],arry.shape[2],arry.shape[1])
+
+    arry = arry.transpose((0,2,1))
+
+    print ("arry.shape[0]//bs", arry.shape[0]//bs)
+    num_train_batch = arry.shape[0]//bs
+    arry = arry[:num_train_batch*bs]
+    arry = arry.reshape(int(arry.shape[0]/bs), bs, arry.shape[1], arry.shape[2])
+
+
+    arry = list(arry)
+
+
+    print (len(arry))
+    print (arry[0].shape)
+
+    train_batch_lst = []
+    for batch_sample in arry:
+        train_batch_lst.append(torch.from_numpy(batch_sample))
+
+
+    arry = train_batch_lst
+    return arry
+
+def array_tensorlst_label (arry, bs):
+    
+    print ("arry.shape[0]//bs", arry.shape[0]//bs)
+    num_train_batch = arry.shape[0]//bs
+    arry = arry[:num_train_batch*bs]
+    arry = arry.reshape(int(arry.shape[0]/bs), bs)
+
+    arry = list(arry)
+
+    print (len(arry))
+    print (arry[0].shape)
+
+    train_batch_lst = []
+    for batch_sample in arry:
+        train_batch_lst.append(torch.from_numpy(batch_sample))
+
+
+    arry = train_batch_lst
+    return arry
+
 def load_part_array (sample_dir_path, unit_num, win_len, stride, part_num):
     filename =  'Unit%s_win%s_str%s_part%s.npz' %(str(int(unit_num)), win_len, stride, part_num)
     filepath =  os.path.join(sample_dir_path, filename)
@@ -89,8 +135,8 @@ def load_part_array_merge (sample_dir_path, unit_num, win_len, win_stride, parti
     return sample_array, label_array
 
 
-def load_array (sample_dir_path, unit_num, win_len, stride, sampling):
-    filename =  'Unit%s_win%s_str%s_smp%s.npz' %(str(int(unit_num)), win_len, stride, sampling)
+def load_array (sample_dir_path, unit_num, win_len, stride):
+    filename =  'Unit%s_win%s_str%s.npz' %(str(int(unit_num)), win_len, stride)
     filepath =  os.path.join(sample_dir_path, filename)
     loaded = np.load(filepath)
 
@@ -157,45 +203,40 @@ units_index_test = [11.0, 14.0, 15.0]
 
 
 
+
 def main():
     # current_dir = os.path.dirname(os.path.abspath(__file__))
-    parser = argparse.ArgumentParser(description='RPs creator')
+    parser = argparse.ArgumentParser(description='NAS CNN')
     parser.add_argument('-w', type=int, default=50, help='sequence length', required=True)
     parser.add_argument('-s', type=int, default=1, help='stride of filter')
-    parser.add_argument('-constant', type=float, default=1e-4, help='constant for #neurons penalty')
-    parser.add_argument('-bs', type=int, default=1000, help='batch size')
-    parser.add_argument('-ep', type=int, default=30, help='max epoch')
-    parser.add_argument('-pt', type=int, default=20, help='patience')
-    parser.add_argument('-vs', type=float, default=0.1, help='validation split')
-    parser.add_argument('-lr', type=float, default=0.001, help='learning rate')
-    parser.add_argument('-sub', type=int, default=1, help='subsampling stride')
-
+    parser.add_argument('-bs', type=int, default=512, help='batch size')
+    parser.add_argument('-pt', type=int, default=30, help='patience')
+    parser.add_argument('-vs', type=float, default=0.2, help='validation split')
+    parser.add_argument('-lr', type=float, default=10**(-1*4), help='learning rate')
+    parser.add_argument('-sub', type=int, default=10, help='subsampling stride')
     parser.add_argument('-t', type=int, required=True, help='trial')
-    parser.add_argument('--sampling', type=int, default=1, help='sampling rate')
-
-    parser.add_argument('--pop', type=int, default=50, required=False, help='population size of EA')
-    parser.add_argument('--gen', type=int, default=50, required=False, help='generations of evolution')
+    parser.add_argument('--pop', type=int, default=20, required=False, help='population size of EA')
+    parser.add_argument('--gen', type=int, default=20, required=False, help='generations of evolution')
     parser.add_argument('--device', type=str, default="GPU", help='Use "basic" if GPU with cuda is not available')
-    parser.add_argument('--obj', type=str, default="moo", help='Use "soo" for single objective and "moo" for multiobjective')
+    parser.add_argument('--obj', type=str, default="soo", help='Use "soo" for single objective and "moo" for multiobjective')
 
     args = parser.parse_args()
 
     win_len = args.w
     win_stride = args.s
-    partition = 3
+
     lr = args.lr
-    cs = args.constant
     bs = args.bs
-    ep = args.ep
     pt = args.pt
     vs = args.vs
     sub = args.sub
-    sampling = args.sampling
 
     device = args.device
     obj = args.obj
-
     trial = args.t
+
+    # random seed predictable
+    jobs = 1
     seed = trial
     random.seed(seed)
     np.random.seed(seed)
@@ -205,18 +246,15 @@ def main():
 
     for index in units_index_train:
         print("Load data index: ", index)
-        sample_array, label_array = load_array (sample_dir_path, index, win_len, win_stride, sampling)
+        sample_array, label_array = load_array (sample_dir_path, index, win_len, win_stride)
         #sample_array, label_array = shuffle_array(sample_array, label_array)
-        print("sample_array.shape", sample_array.shape)
-        print("label_array.shape", label_array.shape)
+
         sample_array = sample_array[::sub]
         label_array = label_array[::sub]
 
-        sample_array = sample_array.astype(np.float32)
-        label_array = label_array.astype(np.float32)
+        # sample_array = sample_array.astype(np.float32)
+        # label_array = label_array.astype(np.float32)
 
-        print("sub sample_array.shape", sample_array.shape)
-        print("sub label_array.shape", label_array.shape)
         train_units_samples_lst.append(sample_array)
         train_units_labels_lst.append(label_array)
 
@@ -232,15 +270,15 @@ def main():
 
     sample_array, label_array = shuffle_array(sample_array, label_array)
     print("samples are shuffled")
-    print("sample_array.shape", sample_array.shape)
-    print("label_array.shape", label_array.shape)
 
-    sample_array = sample_array.reshape(sample_array.shape[0], sample_array.shape[2])
+    # sample_array = sample_array.reshape(sample_array.shape[0], sample_array.shape[2])
     print("sample_array_reshape.shape", sample_array.shape)
     print("label_array_reshape.shape", label_array.shape)
-    feat_len = sample_array.shape[1]
+    window_length = sample_array.shape[1]
+    feat_len = sample_array.shape[2]
     num_samples = sample_array.shape[0]
-    print ("feat_len", feat_len)
+    print ("window_length", window_length)
+    print("feat_len", feat_len)
 
     train_sample_array = sample_array[:int(num_samples*(1-vs))]
     train_label_array = label_array[:int(num_samples*(1-vs))]
@@ -255,6 +293,60 @@ def main():
     sample_array = []
     label_array = []
 
+
+    # train_sample_array.shape (84212, 50, 20) = # samples, win_len, feature_len
+    # train_label_array.shape (84212,)
+    # val_sample_array.shape (21053, 50, 20)
+    # val_label_array.shape (21053,)    
+
+
+
+
+    # train_sample_array = train_sample_array.reshape(train_sample_array.shape[0],train_sample_array.shape[2],train_sample_array.shape[1])
+    
+    # print ("train_sample_array.shape[0]//bs", train_sample_array.shape[0]//bs)
+    # num_train_batch = train_sample_array.shape[0]//bs
+    # num_val_batch = val_sample_array.shape[0]//bs
+    # train_sample_array = train_sample_array[:num_train_batch*bs]
+    # train_sample_array = train_sample_array.reshape(int(train_sample_array.shape[0]/bs), bs, train_sample_array.shape[1], train_sample_array.shape[2])
+
+    # print ("train_sample_array.shape", train_sample_array.shape)
+    # train_label_array = train_label_array[:num_train_batch*bs]
+    # train_label_array = train_label_array.reshape(int(train_label_array.shape[0]/bs), bs)
+
+    # train_sample_array = list(train_sample_array)
+    # train_label_array = list(train_label_array)
+
+    # print (len(train_sample_array))
+    # print (train_sample_array[0].shape)
+
+    # train_batch_lst = []
+    # train_label_batch_lst = []
+    # for batch_sample in train_sample_array:
+    #     train_batch_lst.append(torch.from_numpy(batch_sample))
+
+    # for batch_sample in train_label_array:
+    #     train_label_batch_lst.append(torch.from_numpy(batch_sample))
+
+    # train_sample_array = train_batch_lst
+    # train_label_array = train_label_batch_lst
+
+
+    train_sample_array = array_tensorlst_data(train_sample_array, bs)
+    val_sample_array = array_tensorlst_data(val_sample_array, bs)
+    train_label_array = array_tensorlst_label(train_label_array, bs)
+    val_label_array = array_tensorlst_label(val_label_array, bs)
+
+    print ("train_sample_array[0].shape", train_sample_array[0].shape)
+    print ("train_label_array[0]", len(train_label_array[0]))
+
+    # torch shape should be [batch_size, sequence_length, embedding_dim]
+    # train_sample_array = torch.from_numpy(train_sample_array)
+    # train_label_array = torch.from_numpy(train_label_array)
+    # val_sample_array = torch.from_numpy(val_sample_array)
+    # val_label_array = torch.from_numpy(val_label_array)
+    # print("train_sample_torch.shape", train_sample_torch.shape)
+
     ## Parameters for the GA
     pop_size = args.pop
     n_generations = args.gen
@@ -262,73 +354,76 @@ def main():
     mut_prob = 0.5  # 0.7
     cx_op = "one_point"
     mut_op = "uniform"
-    sel_op = "best"
-    other_args = {
-        'mut_gene_probability': 0.3  # 0.1
-    }
 
+    if obj == "soo":
+        sel_op = "best"
+        other_args = {
+            'mut_gene_probability': 0.3  # 0.1
+        }
 
+        mutate_log_path = os.path.join(directory_path, 'mute_log_ori_%s_%s_%s_%s.csv' % (pop_size, n_generations, obj, trial))
+        mutate_log_col = ['idx', 'params_1', 'params_2', 'params_3', 'params_4', 'params_5', 'fitness_1',
+                          'gen']
+        mutate_log_df = pd.DataFrame(columns=mutate_log_col, index=None)
+        mutate_log_df.to_csv(mutate_log_path, index=False)
 
-    start = time.time()
-
-    # log_file_path = log_path + 'log_%s_%s_pop-%s_gen-%s_%s.csv' % (
-    # subdata_mode_list[subdata_mode], fitness_mode_list[fitness_mode], pop_size, n_generations, trial)
-    # log_col = ['idx', 'stop_epoch', 'window_length', 'n_filters', 'kernel_size', 'n_conv_layer', 'LSTM1_units',
-    #            'LSTM2_units', 'n_window',
-    #            'val_rmse', 'val_score', 'rmse_combined', 'score_combined',
-    #            'AIC', 'train_loss', 'mle_term', 'params_term', 'geno_list']
-    # log_df = pd.DataFrame(columns=log_col, index=None)
-    # log_df.to_csv(log_file_path, index=False)
-    # print(log_df)
-
-
-    # Save log file of EA in csv
-    recursive_clean(directory_path)
-    if not os.path.exists(directory_path):
-        os.makedirs(directory_path)
-
-    mutate_log_path = os.path.join(directory_path, 'mute_log_t-%s_%s_%s.csv' % (trial, pop_size, n_generations))  
-    mutate_log_col = ['idx', 'params_1', 'params_2', 'params_3', 'params_4', 'fitness', 'penalty', 'val_rmse', 'gen']
-    mutate_log_df = pd.DataFrame(columns=mutate_log_col, index=None)
-    mutate_log_df.to_csv(mutate_log_path, index=False)
-
-    # prft_path = os.path.join(directory_path, 'prft_out_%s_%s.csv' % (pop_size, n_generations))
-
-
-    def log_function(population, gen, cs, mutate_log_path = mutate_log_path):
-        for i in range(len(population)):
-            indiv = population[i]
-            lin_check = indiv[3]
-            if  indiv == []:
-                "non_mutated empty"
-                pass
-            else:
-                # print ("i: ", i)
-                indiv.append(indiv.fitness.values[0])
-
-                # append penalty
-                if lin_check == 1:
-                    lin_nrn = 20
+        def log_function(population, gen, hv=None, mutate_log_path=mutate_log_path):
+            for i in range(len(population)):
+                indiv = population[i]
+                if indiv == []:
+                    "non_mutated empty"
+                    pass
                 else:
-                    lin_nrn = 0
+                    # print ("i: ", i)
+                    indiv.append(indiv.fitness.values[0])
+                    indiv.append(gen)
+
+            temp_df = pd.DataFrame(np.array(population), index=None)
+            temp_df.to_csv(mutate_log_path, mode='a', header=None)
+            print("population saved")
+            return
 
 
-                num_nrn = indiv[1]*10 + indiv[2]*10 + lin_nrn
-                penalty = num_nrn * cs
-                val_rmse = indiv.fitness.values[0] - penalty
+    # elif obj == "moo":
+    else:
+        sel_op = "nsga2"
+        other_args = {
+            'mut_gene_probability': 0.4  # 0.1
+        }
+        mutate_log_path = os.path.join(directory_path, 'mute_log_ori_%s_%s_%s_%s.csv' % (pop_size, n_generations, obj, trial ))
+        mutate_log_col = ['idx', 'params_1', 'params_2', 'params_3', 'params_4', 
+                          'fitness_1', 'fitness_2', 'hypervolume', 'gen']
+        mutate_log_df = pd.DataFrame(columns=mutate_log_col, index=None)
+        mutate_log_df.to_csv(mutate_log_path, index=False)
 
-                indiv.append(penalty)
-                indiv.append(val_rmse)
+        def log_function(population, gen, hv=None, mutate_log_path=mutate_log_path):
+            for i in range(len(population)):
+                indiv = population[i]
+                if indiv == []:
+                    "non_mutated empty"
+                    pass
+                else:
+                    # print ("i: ", i)
+                    indiv.append(indiv.fitness.values[0])
+                    indiv.append(indiv.fitness.values[1])
+                    # append val_rmse
+                    indiv.append(hv)
+                    indiv.append(gen)
 
-                # append val_rmse
-                indiv.append(gen)
+            temp_df = pd.DataFrame(np.array(population), index=None)
+            temp_df.to_csv(mutate_log_path, mode='a', header=None)
+            print("population saved")
+            return
 
-        temp_df = pd.DataFrame(np.array(population), index=None)
-        temp_df.to_csv(mutate_log_path, mode='a', header=None)
-        print("population saved")
-        return
+
+
+    prft_path = os.path.join(directory_path, 'prft_out_ori_%s_%s_%s.csv' % (pop_size, n_generations, trial))
+
+
 
     start = time.time()
+
+    cs = 0.0001
 
     # Assign & run EA
     task = SimpleNeuroEvolutionTask(

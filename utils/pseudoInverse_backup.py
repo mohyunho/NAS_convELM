@@ -1,5 +1,5 @@
 import torch
-# from torch.autograd import Variable
+from torch.autograd import Variable
 
 class pseudoInverse(object):
     def __init__(self,params,C=1e-2,forgettingfactor=1,L =10):
@@ -13,15 +13,14 @@ class pseudoInverse(object):
         # For sequential learning in OS-ELM
         self.dimInput=self.params[len(self.params)-1].data.size()[1]
         self.forgettingfactor=forgettingfactor
-        # self.M=Variable(torch.inverse(self.C*torch.eye(self.dimInput)),requires_grad=False, volatile=True)
-        self.M=torch.inverse(self.C*torch.eye(self.dimInput))
+        self.M=Variable(torch.inverse(self.C*torch.eye(self.dimInput)),requires_grad=False, volatile=True)
 
         if self.is_cuda:
             self.M=self.M.cuda()
 
     def initialize(self):
-        # self.M = Variable(torch.inverse(self.C * torch.eye(self.dimInput)),requires_grad=False, volatile=True)
-        self.M = torch.inverse(self.C * torch.eye(self.dimInput))
+        self.M = Variable(torch.inverse(self.C * torch.eye(self.dimInput)),requires_grad=False, volatile=True)
+
         if self.is_cuda:
             self.M = self.M.cuda()
         self.w = self.params[len(self.params) - 1]
@@ -30,17 +29,16 @@ class pseudoInverse(object):
     def pseudoBig(self,inputs,targets):
         xtx = torch.mm(inputs.t(), inputs) # [ n_features * n_features ]
         dimInput=inputs.size()[1]
-        I = torch.eye(dimInput)
+        I = Variable(torch.eye(dimInput),requires_grad=False, volatile=True)
         if self.is_cuda:
             I = I.cuda()
         if self.L > 0.0:
             mu = torch.mean(inputs, dim=0, keepdim=True)  # [ 1 * n_features ]
             S = inputs - mu
             S = torch.mm(S.t(), S)
-            self.M = torch.inverse(xtx.data + self.C * (I.data+self.L*S.data))
+            self.M = Variable(torch.inverse(xtx.data + self.C * (I.data+self.L*S.data)),requires_grad=False, volatile=True)
         else:
-            self.M = torch.inverse(xtx.data + self.C *I.data)
-      
+            self.M = Variable(torch.inverse(xtx.data + self.C *I.data), requires_grad=False, volatile=True)
 
         w = torch.mm(self.M, inputs.t())
         w = torch.mm(w, targets)
@@ -49,11 +47,10 @@ class pseudoInverse(object):
     def pseudoSmall(self,inputs,targets):
         xxt = torch.mm(inputs, inputs.t())
         numSamples=inputs.size()[0]
-        # print ("numSamples", numSamples)
-        I = torch.eye(numSamples)
+        I = Variable(torch.eye(numSamples),requires_grad=False, volatile=True)
         if self.is_cuda:
             I = I.cuda()
-        self.M = torch.inverse(xxt.data + self.C * I.data)
+        self.M = Variable(torch.inverse(xxt.data + self.C * I.data),requires_grad=False, volatile=True)
         w = torch.mm(inputs.t(), self.M)
         w = torch.mm(w, targets)
 
@@ -66,8 +63,6 @@ class pseudoInverse(object):
         numSamples=inputs.size()[0]
         dimInput=inputs.size()[1]
         dimTarget=targets.size()[1]
-
-        
 
         if numSamples>dimInput:
             self.pseudoBig(inputs,targets)
@@ -83,18 +78,18 @@ class pseudoInverse(object):
         dimTarget = oneHotTarget.size()[1]
 
         if numSamples<dimInput:
-            I1 = torch.eye(dimInput)
+            I1 = Variable(torch.eye(dimInput))
             if self.is_cuda:
                 I1 = I1.cuda()
             xtx=torch.mm(inputs.t(),inputs)
-            self.M=torch.inverse(xtx.data+self.C*I1.data)
+            self.M=Variable(torch.inverse(xtx.data+self.C*I1.data),requires_grad=False, volatile=True)
 
-        I = torch.eye(numSamples)
+        I = Variable(torch.eye(numSamples))
         if self.is_cuda:
             I = I.cuda()
 
         self.M = (1/self.forgettingfactor) * self.M - torch.mm((1/self.forgettingfactor) * self.M,
-                                             torch.mm(inputs.t(), torch.mm(torch.inverse(I.data + torch.mm(inputs, torch.mm((1/self.forgettingfactor)* self.M, inputs.t())).data),
+                                             torch.mm(inputs.t(), torch.mm(Variable(torch.inverse(I.data + torch.mm(inputs, torch.mm((1/self.forgettingfactor)* self.M, inputs.t())).data),requires_grad=False, volatile=True),
                                              torch.mm(inputs, (1/self.forgettingfactor)* self.M))))
 
 
@@ -109,7 +104,7 @@ class pseudoInverse(object):
 
         if self.is_cuda:
             oneHotTarget=oneHotTarget.cuda()
-        oneHotTarget=oneHotTarget
+        oneHotTarget=Variable(oneHotTarget,requires_grad=False, volatile=True)
 
         return oneHotTarget
 

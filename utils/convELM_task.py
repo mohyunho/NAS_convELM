@@ -7,9 +7,17 @@ import pandas as pd
 from abc import abstractmethod
 
 # from input_creator import input_gen
-from utils.elm_network import network_fit
+from utils.convELM_network import Net
+from utils.convELM_network import train_net
+# from utils.pseudoInverse import pseudoInverse
 
-
+import torch
+import torch.utils.data.dataloader
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.optim as optim
+from torchvision import datasets, transforms
+from torch.autograd import Variable
 
 def release_list(lst):
    del lst[:]
@@ -46,14 +54,16 @@ class SimpleNeuroEvolutionTask(Task):
         self.obj = obj
 
     def get_n_parameters(self):
-        return 4
+        return 5
 
     def get_parameters_bounds(self):
         bounds = [
-            (1, 5), #L2 norm params, 0
-            (1, 200), #type1 neurons, 1 (1, 200)
-            (1, 200), #type2 neurons, 2 (1, 200)
-            (1, 2), #type5 neurons, 3
+            (1, 5), #conv1_ch_mul
+            (1, 10), #conv1_kernel_size
+            (1, 5), #conv2_ch_mul
+            (1, 10), #conv2_kernel_size
+            (1, 10), #conv3_kernel_size
+            # (1, 10), #lin_mul
         ]
         return bounds
 
@@ -64,48 +74,38 @@ class SimpleNeuroEvolutionTask(Task):
         :return:
         '''
         print ("######################################################################################")
-        l2_parms_lst = [1e-2, 1e-3, 1e-4, 1e-5, 1e-6]
-        l2_parm = l2_parms_lst[genotype[0]-1]
-        type_neuron_lst = ["tanh", "sigm", "lin"]
-
-        lin_check = genotype[3]
-
-        num_neuron_lst = []
-
-        for n in range(2):
-            num_neuron_lst.append(genotype[n+1]*10)
-
-        if lin_check == 1:
-            num_neuron_lst.append(20)
-        else:
-            num_neuron_lst.append(0)
-
+        # l2_parms_lst = [1, 1e-1, 1e-2, 1e-3]
+        # l2_parm = l2_parms_lst[genotype[0]-1]
+        l2_parm = 1e-1
         print("l2_params: " ,l2_parm)
-        print ("lin_check: ", lin_check)
-        print("num_neuron_lst: ", num_neuron_lst)
-        print("type_neuron_lst: ", type_neuron_lst)
+        feat_len = self.train_sample_array[0].shape[1]
+        win_len = self.train_sample_array[0].shape[2]
+        print ("feat_len", feat_len)
+        print ("win_len", win_len)
+        # print ("lin_mul",  genotype[4])
 
-        feat_len = self.train_sample_array.shape[1]
+        conv1_ch_mul = genotype[0]
+        conv1_kernel_size = genotype[1]
+        conv2_ch_mul = genotype[2]
+        conv2_kernel_size = genotype[3]
+        conv3_ch_mul = 1
+        conv3_kernel_size = genotype[4]
+        # lin_mul = genotype[4]
 
-        elm_class = network_fit(feat_len, l2_parm, lin_check,
-                                num_neuron_lst, type_neuron_lst, self.model_path, self.device, self.batch)
+        # convELM_model = Net(feat_len, win_len, conv1_ch_mul, conv1_kernel_size, conv2_ch_mul, conv2_kernel_size, lin_mul, l2_parm, self.model_path)
+        
+        # convELM_model = Net(feat_len, win_len, conv1_ch_mul, conv1_kernel_size, conv2_ch_mul, conv2_kernel_size, l2_parm, self.model_path)
 
-        elm_net = elm_class.trained_model()
-        validation = elm_class.train_net(elm_net, self.train_sample_array, self.train_label_array, self.val_sample_array,
-                                    self.val_label_array)
+        convELM_model = Net(feat_len, win_len, conv1_ch_mul, conv1_kernel_size, conv2_ch_mul, conv2_kernel_size, conv3_ch_mul, conv3_kernel_size, l2_parm, self.model_path)
+
+        print("convELM_model", convELM_model)
+
+        validation, model = train_net(convELM_model, self.train_sample_array, self.train_label_array, self.val_sample_array,
+                                    self.val_label_array, l2_parm, self.device)
 
         val_value = validation[0]
 
-        print ("num_neuron_lst", num_neuron_lst)
-        penalty = self.constant * sum(num_neuron_lst)
 
-        val_penalty = val_value + penalty
-
-        val_penalty = round(val_penalty, 8)
-        val_value = round(val_value, 8)
-
-        print ("validation rmse-%s, penalty-%s, num_neurons-%s, const-%s" %(str(val_value), str(penalty),
-                                                                            str(self.constant), str(sum(num_neuron_lst))))
 
 
         if self.obj == "soo":
@@ -116,9 +116,8 @@ class SimpleNeuroEvolutionTask(Task):
 
         print("fitness: ", fitness)
 
-        elm_class = None
-        elm_net  = None
-        del elm_class, elm_net
+        convELM_model = None
+        del convELM_model
 
         return fitness
 
