@@ -7,8 +7,8 @@ import pandas as pd
 from abc import abstractmethod
 
 # from input_creator import input_gen
-from utils.convELM_network import ConvElm
-from utils.convELM_network import train_net
+from utils.convELM_network_simp import ConvElm
+from utils.convELM_network_simp import train_net
 # from utils.pseudoInverse import pseudoInverse
 
 
@@ -48,16 +48,12 @@ class SimpleNeuroEvolutionTask(Task):
         self.obj = obj
 
     def get_n_parameters(self):
-        return 5
+        return 2
 
     def get_parameters_bounds(self):
         bounds = [
-            (1, 15), #conv1_ch_mul
+            (10, 50), #conv1_ch_mul
             (1, 10), #conv1_kernel_size
-            (1, 15), #conv2_ch_mul
-            (1, 10), #conv2_kernel_size
-            (1, 10), #conv3_kernel_size
-            # (1, 10), #lin_mul
         ]
         return bounds
 
@@ -72,25 +68,22 @@ class SimpleNeuroEvolutionTask(Task):
         # l2_parm = l2_parms_lst[genotype[0]-1]
         l2_parm = 1e-2
         print("l2_params: " ,l2_parm)
-        feat_len = self.train_sample_array[0].shape[1]
-        win_len = self.train_sample_array[0].shape[2]
+        feat_len = self.train_sample_array.shape[1]
+        win_len = self.train_sample_array.shape[2]
         print ("feat_len", feat_len)
         print ("win_len", win_len)
         # print ("lin_mul",  genotype[4])
 
         conv1_ch_mul = genotype[0]
         conv1_kernel_size = genotype[1]
-        conv2_ch_mul = genotype[2]
-        conv2_kernel_size = genotype[3]
-        conv3_ch_mul = 1
-        conv3_kernel_size = genotype[4]
+
         # lin_mul = genotype[4]
 
         # convELM_model = Net(feat_len, win_len, conv1_ch_mul, conv1_kernel_size, conv2_ch_mul, conv2_kernel_size, lin_mul, l2_parm, self.model_path)
         
         # convELM_model = Net(feat_len, win_len, conv1_ch_mul, conv1_kernel_size, conv2_ch_mul, conv2_kernel_size, l2_parm, self.model_path)
 
-        convELM_model = ConvElm(feat_len, win_len, conv1_ch_mul, conv1_kernel_size, conv2_ch_mul, conv2_kernel_size, conv3_ch_mul, conv3_kernel_size, l2_parm, self.model_path).to(self.device)
+        convELM_model = ConvElm(feat_len, win_len, conv1_ch_mul, conv1_kernel_size,  l2_parm, self.model_path).to(self.device)
 
         # print("convELM_model", convELM_model)
         print(f"Model structure: {convELM_model}\n\n")

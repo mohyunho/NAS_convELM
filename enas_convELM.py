@@ -38,6 +38,7 @@ from utils.ea_multi import GeneticAlgorithm
 
 import torch
 
+
 # random seed predictable
 jobs = 1
 
@@ -67,50 +68,71 @@ if not os.path.exists(directory_path):
 load array from npz files
 '''
 
-def array_tensorlst_data (arry, bs):
+def array_tensorlst_data (arry, bs, device):
     # arry = arry.reshape(arry.shape[0],arry.shape[2],arry.shape[1])
+
+    if bs > arry.shape[0]:
+        bs = arry.shape[0]
 
     arry = arry.transpose((0,2,1))
 
     print ("arry.shape[0]//bs", arry.shape[0]//bs)
     num_train_batch = arry.shape[0]//bs
-    arry = arry[:num_train_batch*bs]
-    arry = arry.reshape(int(arry.shape[0]/bs), bs, arry.shape[1], arry.shape[2])
+    print (arry.shape)
+    arry_cut = arry[:num_train_batch*bs]
+    arrt_rem = arry[num_train_batch*bs:]
+    print (arry.shape)
+    arry4d = arry_cut.reshape(int(arry_cut.shape[0]/bs), bs, arry_cut.shape[1], arry_cut.shape[2])
+    print (arry4d.shape)
 
+    arry_lst = list(arry4d)
 
-    arry = list(arry)
+    arry_lst.append(arrt_rem)
 
-
-    print (len(arry))
-    print (arry[0].shape)
+    print (len(arry_lst))
+    print (arry_lst[0].shape)
 
     train_batch_lst = []
-    for batch_sample in arry:
-        train_batch_lst.append(torch.from_numpy(batch_sample))
+    for batch_sample in arry_lst:
+        arr_tensor = torch.from_numpy(batch_sample)
+        if torch.cuda.is_available():
+            arr_tensor = arr_tensor.to(device)
+        train_batch_lst.append(arr_tensor)
 
 
-    arry = train_batch_lst
-    return arry
-
-def array_tensorlst_label (arry, bs):
     
+    return train_batch_lst
+
+
+
+def array_tensorlst_label (arry, bs, device):
+
+    if bs > arry.shape[0]:
+        bs = arry.shape[0]  
+
     print ("arry.shape[0]//bs", arry.shape[0]//bs)
     num_train_batch = arry.shape[0]//bs
-    arry = arry[:num_train_batch*bs]
-    arry = arry.reshape(int(arry.shape[0]/bs), bs)
+    arry_cut = arry[:num_train_batch*bs]
+    arrt_rem = arry[num_train_batch*bs:]
+    arry2d = arry_cut.reshape(int(arry_cut.shape[0]/bs), bs)
 
-    arry = list(arry)
+    arry_lst = list(arry2d)
 
-    print (len(arry))
-    print (arry[0].shape)
+    arry_lst.append(arrt_rem)
+
+    print (len(arry_lst))
+    print (arry_lst[0].shape)
 
     train_batch_lst = []
-    for batch_sample in arry:
-        train_batch_lst.append(torch.from_numpy(batch_sample))
+    for batch_sample in arry_lst:
+        arr_tensor = torch.from_numpy(batch_sample)
+        if torch.cuda.is_available():
+            arr_tensor = arr_tensor.to(device)
+        train_batch_lst.append(arr_tensor)
+
+    return train_batch_lst
 
 
-    arry = train_batch_lst
-    return arry
 
 def load_part_array (sample_dir_path, unit_num, win_len, stride, part_num):
     filename =  'Unit%s_win%s_str%s_part%s.npz' %(str(int(unit_num)), win_len, stride, part_num)
@@ -203,6 +225,14 @@ units_index_test = [11.0, 14.0, 15.0]
 
 
 
+def tensor_type_checker(tensor, device):
+    if torch.cuda.is_available():
+        tensor = tensor.to(device)
+    print(f"Shape of tensor: {tensor.shape}")
+    print(f"Datatype of tensor: {tensor.dtype}")
+    print(f"Device tensor is stored on: {tensor.device}")
+    return tensor
+
 
 def main():
     # current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -211,13 +241,14 @@ def main():
     parser.add_argument('-s', type=int, default=1, help='stride of filter')
     parser.add_argument('-bs', type=int, default=512, help='batch size')
     parser.add_argument('-pt', type=int, default=30, help='patience')
+    parser.add_argument('-ep', type=int, default=100, help='epochs')
     parser.add_argument('-vs', type=float, default=0.2, help='validation split')
     parser.add_argument('-lr', type=float, default=10**(-1*4), help='learning rate')
     parser.add_argument('-sub', type=int, default=10, help='subsampling stride')
     parser.add_argument('-t', type=int, required=True, help='trial')
     parser.add_argument('--pop', type=int, default=20, required=False, help='population size of EA')
     parser.add_argument('--gen', type=int, default=20, required=False, help='generations of evolution')
-    parser.add_argument('--device', type=str, default="GPU", help='Use "basic" if GPU with cuda is not available')
+    parser.add_argument('--device', type=str, default="cuda", help='Use "basic" if GPU with cuda is not available')
     parser.add_argument('--obj', type=str, default="soo", help='Use "soo" for single objective and "moo" for multiobjective')
 
     args = parser.parse_args()
@@ -227,19 +258,31 @@ def main():
 
     lr = args.lr
     bs = args.bs
+    ep = args.ep
     pt = args.pt
     vs = args.vs
     sub = args.sub
 
     device = args.device
+    print(f"Using {device} device")
+
+
+
     obj = args.obj
     trial = args.t
 
     # random seed predictable
     jobs = 1
     seed = trial
-    random.seed(seed)
-    np.random.seed(seed)
+
+    # torch.backends.cudnn.deterministic = True
+    # torch.backends.cudnn.benchmark = False
+    # torch.manual_seed(seed)
+    # torch.cuda.manual_seed_all(seed)
+    # np.random.seed(seed)
+    # random.seed(seed)
+
+
 
     train_units_samples_lst =[]
     train_units_labels_lst = []
@@ -247,7 +290,7 @@ def main():
     for index in units_index_train:
         print("Load data index: ", index)
         sample_array, label_array = load_array (sample_dir_path, index, win_len, win_stride)
-        #sample_array, label_array = shuffle_array(sample_array, label_array)
+        sample_array, label_array = shuffle_array(sample_array, label_array)
 
         sample_array = sample_array[::sub]
         label_array = label_array[::sub]
@@ -268,7 +311,7 @@ def main():
     train_units_labels_lst = []
     print("Memory released")
 
-    sample_array, label_array = shuffle_array(sample_array, label_array)
+    # sample_array, label_array = shuffle_array(sample_array, label_array)
     print("samples are shuffled")
 
     # sample_array = sample_array.reshape(sample_array.shape[0], sample_array.shape[2])
@@ -299,53 +342,37 @@ def main():
     # val_sample_array.shape (21053, 50, 20)
     # val_label_array.shape (21053,)    
 
+    if bs > train_sample_array.shape[0]:
+        train_arry = array_tensorlst_data(train_sample_array, bs, device)[0]
+        label_arry = array_tensorlst_label(train_label_array, bs, device)[0]
+        train_sample_array = []
+        train_label_array = []
+        train_sample_array.append(train_arry)
+        train_label_array.append(label_arry)
+    else:
+        train_sample_array = array_tensorlst_data(train_sample_array, bs, device)
+        train_label_array = array_tensorlst_label(train_label_array, bs, device)
 
+    if bs > val_sample_array.shape[0]:
+        train_arry = array_tensorlst_data(val_sample_array, bs, device)[0]
+        label_arry = array_tensorlst_label(val_label_array, bs, device)[0]
+        val_sample_array = []
+        val_label_array = []
 
+        val_sample_array.append(train_arry)
+        val_label_array.append(label_arry)
+    else:
+        val_sample_array = array_tensorlst_data(val_sample_array, bs, device)
+        val_label_array = array_tensorlst_label(val_label_array, bs, device)
 
-    # train_sample_array = train_sample_array.reshape(train_sample_array.shape[0],train_sample_array.shape[2],train_sample_array.shape[1])
-    
-    # print ("train_sample_array.shape[0]//bs", train_sample_array.shape[0]//bs)
-    # num_train_batch = train_sample_array.shape[0]//bs
-    # num_val_batch = val_sample_array.shape[0]//bs
-    # train_sample_array = train_sample_array[:num_train_batch*bs]
-    # train_sample_array = train_sample_array.reshape(int(train_sample_array.shape[0]/bs), bs, train_sample_array.shape[1], train_sample_array.shape[2])
-
-    # print ("train_sample_array.shape", train_sample_array.shape)
-    # train_label_array = train_label_array[:num_train_batch*bs]
-    # train_label_array = train_label_array.reshape(int(train_label_array.shape[0]/bs), bs)
-
-    # train_sample_array = list(train_sample_array)
-    # train_label_array = list(train_label_array)
-
-    # print (len(train_sample_array))
-    # print (train_sample_array[0].shape)
-
-    # train_batch_lst = []
-    # train_label_batch_lst = []
-    # for batch_sample in train_sample_array:
-    #     train_batch_lst.append(torch.from_numpy(batch_sample))
-
-    # for batch_sample in train_label_array:
-    #     train_label_batch_lst.append(torch.from_numpy(batch_sample))
-
-    # train_sample_array = train_batch_lst
-    # train_label_array = train_label_batch_lst
-
-
-    train_sample_array = array_tensorlst_data(train_sample_array, bs)
-    val_sample_array = array_tensorlst_data(val_sample_array, bs)
-    train_label_array = array_tensorlst_label(train_label_array, bs)
-    val_label_array = array_tensorlst_label(val_label_array, bs)
-
+    bs = train_sample_array[0].shape[0]
     print ("train_sample_array[0].shape", train_sample_array[0].shape)
-    print ("train_label_array[0]", len(train_label_array[0]))
+    # tensor_type_checker(train_sample_array[0], device) 
+    # tensor_type_checker(train_label_array[0], device) 
+    # tensor_type_checker(val_sample_array[0], device) 
+    # tensor_type_checker(val_label_array[0], device) 
 
-    # torch shape should be [batch_size, sequence_length, embedding_dim]
-    # train_sample_array = torch.from_numpy(train_sample_array)
-    # train_label_array = torch.from_numpy(train_label_array)
-    # val_sample_array = torch.from_numpy(val_sample_array)
-    # val_label_array = torch.from_numpy(val_label_array)
-    # print("train_sample_torch.shape", train_sample_torch.shape)
+
 
     ## Parameters for the GA
     pop_size = args.pop
@@ -432,6 +459,7 @@ def main():
         val_sample_array = val_sample_array,
         val_label_array = val_label_array,
         constant = cs,
+        epochs = ep,
         batch=bs,
         model_path = model_temp_path,
         device = device,
@@ -470,127 +498,6 @@ def main():
     end = time.time()
     print("EA time: ", end - start)
     print ("####################  EA COMPLETE / HOF TEST   ##############################")
-
-
-
-
-
-
-
-    """ Creates a new instance of the training-validation task and computes the fitness of the current individual """
-
-    l2_parms_lst = [1e-2, 1e-3, 1e-4, 1e-5, 1e-6]
-    l2_parm = l2_parms_lst[hof[0][0] - 1]
-    type_neuron_lst = ["tanh", "sigm", "lin"]
-
-    lin_check = hof[0][3]
-    num_neuron_lst = []
-    for n in range(2):
-        num_neuron_lst.append(hof[0][n + 1] * 10)
-    if lin_check == 1:
-        num_neuron_lst.append(20)
-    else:
-        num_neuron_lst.append(0)
-
-    print("HoF l2_params: ", l2_parm)
-    print("HoF lin_check: ", lin_check)
-    print("HoF num_neuron_lst: ", num_neuron_lst)
-    print("HoF type_neuron_lst: ", type_neuron_lst)
-
-    feat_len = train_sample_array.shape[1]
-    best_elm_class = network_fit(feat_len,
-                          l2_parm, lin_check,
-                          num_neuron_lst, type_neuron_lst, model_temp_path, device, bs)
-    best_elm_net = best_elm_class.trained_model()
-
-    # Train the best network
-    sample_array = np.concatenate((train_sample_array, val_sample_array))
-    label_array = np.concatenate((train_label_array, val_label_array))
-
-    start = time.time()
-
-    print ("sample_array.shape", sample_array.shape)
-    print("label_array.shape", label_array.shape)
-    best_elm_net.train(sample_array, label_array, "R")
-    print("individual trained...evaluation in progress...")
-    neurons_lst, norm_check = best_elm_net.summary()
-    print("summary: ", neurons_lst, norm_check)
-
-    end = time.time()
-
-
-    output_lst = []
-    truth_lst = []
-
-    # Test
-    for index in units_index_test:
-        print ("test idx: ", index)
-        sample_array, label_array = load_array(sample_dir_path, index, win_len, win_stride, sampling)
-        # estimator = load_model(tf_temp_path, custom_objects={'rmse':rmse})
-        print("sample_array.shape", sample_array.shape)
-        print("label_array.shape", label_array.shape)
-        sample_array = sample_array[::sub]
-        label_array = label_array[::sub]
-        print("sub sample_array.shape", sample_array.shape)
-        print("sub label_array.shape", label_array.shape)
-        sample_array = sample_array.reshape(sample_array.shape[0], sample_array.shape[2])
-        print("sample_array_reshape.shape", sample_array.shape)
-        print("label_array_reshape.shape", label_array.shape)
-
-        sample_array = sample_array.astype(np.float32)
-        label_array = label_array.astype(np.float32)
-
-        # estimator = load_model(model_temp_path)
-
-        y_pred_test = best_elm_net.predict(sample_array)
-        output_lst.append(y_pred_test)
-        truth_lst.append(label_array)
-
-    print(output_lst[0].shape)
-    print(truth_lst[0].shape)
-
-    print(np.concatenate(output_lst).shape)
-    print(np.concatenate(truth_lst).shape)
-
-    output_array = np.concatenate(output_lst)[:, 0]
-    trytg_array = np.concatenate(truth_lst)
-    print(output_array.shape)
-    print(trytg_array.shape)
-
-    output_array = output_array.flatten()
-    print(output_array.shape)
-    print(trytg_array.shape)
-    score = score_calculator(output_array, trytg_array)
-    print("score: ", score)
-
-    rms = sqrt(mean_squared_error(output_array, trytg_array))
-    print(rms)
-    rms = round(rms, 2)
-    score = round(score, 2)
-
-
-    for idx in range(len(units_index_test)):
-        print(output_lst[idx])
-        print(truth_lst[idx])
-        fig_verify = plt.figure(figsize=(24, 10))
-        plt.plot(output_lst[idx], color="green")
-        plt.plot(truth_lst[idx], color="red", linewidth=2.0)
-        plt.title('Unit%s inference' %str(int(units_index_test[idx])), fontsize=30)
-        plt.yticks(fontsize=20)
-        plt.xticks(fontsize=20)
-        plt.ylabel('RUL', fontdict={'fontsize': 24})
-        plt.xlabel('Timestamps', fontdict={'fontsize': 24})
-        plt.legend(['Predicted', 'Truth'], loc='upper right', fontsize=28)
-        plt.ylim([-20, 80])
-        plt.show()
-        fig_verify.savefig(pic_dir + "/best_elm_unit%s_test_pop%s_gen%s_rmse-%s_score-%s.png" %(str(int(units_index_test[idx])),
-                                                                              str(args.pop), str(args.gen), str(rms), str(score)))
-
-    print("BEST model training time: ", end - start)
-    print("HOF phenotype: ", [l2_parms_lst[hof[0][0] - 1], hof[0][1] * 10, hof[0][2] * 10, hof[0][3]])
-    print(" test RMSE: ", rms)
-    print(" test Score: ", score)
-
 
 
 

@@ -29,28 +29,15 @@ from sklearn import pipeline
 from sklearn.metrics import mean_squared_error
 from math import sqrt
 
+
 from utils.elm_network import network_fit
 
 from utils.hpelm import ELM, HPELM
-from utils.convELM_task import SimpleNeuroEvolutionTask
+from utils.convELM_task_simp import SimpleNeuroEvolutionTask
 from utils.ea_multi import GeneticAlgorithm
 
 import torch
-import torch.utils.data.dataloader
-import torch.nn as nn
-import torch.nn.functional as F
-import torch.optim as optim
-from torchvision import datasets, transforms
-from torch.autograd import Variable
-from utils.pseudoInverse import pseudoInverse
 
-from utils.convELM_network import ConvElm
-from utils.convELM_network import train_net, test_net
-
-# np.random.seed(0)
-# torch.cuda.manual_seed(0)
-# torch.backends.cudnn.deterministic = True
-# print ("torch.cuda.is_available()", torch.cuda.is_available())
 
 # random seed predictable
 jobs = 1
@@ -117,6 +104,7 @@ def array_tensorlst_data (arry, bs, device):
     return train_batch_lst
 
 
+
 def array_tensorlst_label (arry, bs, device):
 
     if bs > arry.shape[0]:
@@ -143,6 +131,30 @@ def array_tensorlst_label (arry, bs, device):
         train_batch_lst.append(arr_tensor)
 
     return train_batch_lst
+
+
+
+def load_part_array (sample_dir_path, unit_num, win_len, stride, part_num):
+    filename =  'Unit%s_win%s_str%s_part%s.npz' %(str(int(unit_num)), win_len, stride, part_num)
+    filepath =  os.path.join(sample_dir_path, filename)
+    loaded = np.load(filepath)
+    return loaded['sample'], loaded['label']
+
+def load_part_array_merge (sample_dir_path, unit_num, win_len, win_stride, partition):
+    sample_array_lst = []
+    label_array_lst = []
+    print ("Unit: ", unit_num)
+    for part in range(partition):
+      print ("Part.", part+1)
+      sample_array, label_array = load_part_array (sample_dir_path, unit_num, win_len, win_stride, part+1)
+      sample_array_lst.append(sample_array)
+      label_array_lst.append(label_array)
+    sample_array = np.dstack(sample_array_lst)
+    label_array = np.concatenate(label_array_lst)
+    sample_array = sample_array.transpose(2, 0, 1)
+    print ("sample_array.shape", sample_array.shape)
+    print ("label_array.shape", label_array.shape)
+    return sample_array, label_array
 
 
 def load_array (sample_dir_path, unit_num, win_len, stride):
@@ -213,6 +225,14 @@ units_index_test = [11.0, 14.0, 15.0]
 
 
 
+def tensor_type_checker(tensor, device):
+    if torch.cuda.is_available():
+        tensor = tensor.to(device)
+    print(f"Shape of tensor: {tensor.shape}")
+    print(f"Datatype of tensor: {tensor.dtype}")
+    print(f"Device tensor is stored on: {tensor.device}")
+    return tensor
+
 
 def main():
     # current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -245,27 +265,32 @@ def main():
 
     device = args.device
     print(f"Using {device} device")
+
+
+
     obj = args.obj
     trial = args.t
 
-    pop_size = args.pop
-    n_generations = args.gen
-
     # random seed predictable
     jobs = 1
-    # seed = trial
     seed = trial
 
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
+    random.seed(seed)
 
 
-    ############ Prepare train data
+
     train_units_samples_lst =[]
     train_units_labels_lst = []
 
     for index in units_index_train:
         print("Load data index: ", index)
         sample_array, label_array = load_array (sample_dir_path, index, win_len, win_stride)
-        sample_array, label_array = shuffle_array(sample_array, label_array)
+        #sample_array, label_array = shuffle_array(sample_array, label_array)
 
         sample_array = sample_array[::sub]
         label_array = label_array[::sub]
@@ -286,7 +311,7 @@ def main():
     train_units_labels_lst = []
     print("Memory released")
 
-    # sample_array, label_array = shuffle_array(sample_array, label_array)
+    sample_array, label_array = shuffle_array(sample_array, label_array)
     print("samples are shuffled")
 
     # sample_array = sample_array.reshape(sample_array.shape[0], sample_array.shape[2])
@@ -312,6 +337,12 @@ def main():
     label_array = []
 
 
+    # train_sample_array.shape (84212, 50, 20) = # samples, win_len, feature_len
+    # train_label_array.shape (84212,)
+    # val_sample_array.shape (21053, 50, 20)
+    # val_label_array.shape (21053,)    
+
+
     train_sample_array = array_tensorlst_data(train_sample_array, bs, device)[0]
     val_sample_array = array_tensorlst_data(val_sample_array, bs, device)[0]
     train_label_array = array_tensorlst_label(train_label_array, bs, device)[0]
@@ -319,71 +350,138 @@ def main():
 
     bs = train_sample_array.shape[0]
 
-    model_path = ""
-    ##############
-    # Read csv file of EA_log
-    mutate_log_path = os.path.join(directory_path, 'mute_log_ori_%s_%s_%s_%s.csv' % (pop_size, n_generations, obj, trial))
-    ea_log_df = pd.read_csv(mutate_log_path)
-    # Select HOF
-    hof_df = ea_log_df.loc[ea_log_df["fitness_1"] == min(ea_log_df["fitness_1"].values)]
-    hof_df = hof_df.loc[hof_df["gen"] == max(hof_df["gen"].values)]
-    hof_df = hof_df.astype(int)
-    hof_ind = hof_df.iloc[0]
-
-    # Generated an optimized conv ELM
-    l2_parm = 1e-2
-    feat_len = train_sample_array.shape[1]
-    win_len = train_sample_array.shape[2]
-    conv1_ch_mul = hof_ind["params_1"]
-    conv1_kernel_size = hof_ind["params_2"]
-    conv2_ch_mul = hof_ind["params_3"]
-    conv2_kernel_size = hof_ind["params_4"]
-    conv3_ch_mul = 1
-    conv3_kernel_size = hof_ind["params_5"]
-
-    print ("hof_ind", hof_ind)
-    convELM_model = ConvElm(feat_len, win_len, conv1_ch_mul, conv1_kernel_size, conv2_ch_mul, conv2_kernel_size, conv3_ch_mul, conv3_kernel_size, l2_parm, model_path).to(device)
-
-    # print("convELM_model", convELM_model)
-    print(f"Model structure: {convELM_model}\n\n")
-
-    epochs = 0
-    validation = train_net(convELM_model, train_sample_array, train_label_array, val_sample_array,
-                                val_label_array, l2_parm, ep, device)
-
-    # prft_path = os.path.join(directory_path, 'prft_out_ori_%s_%s_%s.csv' % (pop_size, n_generations, trial))
+    # tensor_type_checker(train_sample_array[0], device) 
+    # tensor_type_checker(train_label_array[0], device) 
+    # tensor_type_checker(val_sample_array[0], device) 
+    # tensor_type_checker(val_label_array[0], device) 
 
 
 
+    ## Parameters for the GA
+    pop_size = args.pop
+    n_generations = args.gen
+    cx_prob = 0.5  # 0.25
+    mut_prob = 0.5  # 0.7
+    cx_op = "one_point"
+    mut_op = "uniform"
 
-    ############ Prepare test data
-    output_lst =[]
-    truth_lst = []
+    if obj == "soo":
+        sel_op = "best"
+        other_args = {
+            'mut_gene_probability': 0.3  # 0.1
+        }
 
-    for index in units_index_test:
-        print("Load data index: ", index)
-        sample_array, label_array = load_array (sample_dir_path, index, win_len, win_stride)
-        #sample_array, label_array = shuffle_array(sample_array, label_array)
+        mutate_log_path = os.path.join(directory_path, 'mute_log_ori_%s_%s_%s_%s.csv' % (pop_size, n_generations, obj, trial))
+        mutate_log_col = ['idx', 'params_1', 'params_2', 'params_3', 'params_4', 'params_5', 'fitness_1',
+                          'gen']
+        mutate_log_df = pd.DataFrame(columns=mutate_log_col, index=None)
+        mutate_log_df.to_csv(mutate_log_path, index=False)
 
-        sample_array = sample_array[::sub]
-        label_array = label_array[::sub]
+        def log_function(population, gen, hv=None, mutate_log_path=mutate_log_path):
+            for i in range(len(population)):
+                indiv = population[i]
+                if indiv == []:
+                    "non_mutated empty"
+                    pass
+                else:
+                    # print ("i: ", i)
+                    indiv.append(indiv.fitness.values[0])
+                    indiv.append(gen)
 
-        test_sample_array = array_tensorlst_data(sample_array, bs, device)[0]
-        test_label_array = array_tensorlst_label(label_array, bs, device)[0]
-        y_pred_test, label_array = test_net(convELM_model, test_sample_array, test_label_array)
-        output_lst.append(y_pred_test)
-        truth_lst.append(label_array)
+            temp_df = pd.DataFrame(np.array(population), index=None)
+            temp_df.to_csv(mutate_log_path, mode='a', header=None)
+            print("population saved")
+            return
 
-    print(np.concatenate(output_lst).shape)
-    print(np.concatenate(truth_lst).shape)
 
-    output_array = np.concatenate(output_lst).flatten()
-    trytg_array = np.concatenate(truth_lst).flatten()
+    # elif obj == "moo":
+    else:
+        sel_op = "nsga2"
+        other_args = {
+            'mut_gene_probability': 0.4  # 0.1
+        }
+        mutate_log_path = os.path.join(directory_path, 'mute_log_ori_%s_%s_%s_%s.csv' % (pop_size, n_generations, obj, trial ))
+        mutate_log_col = ['idx', 'params_1', 'params_2', 'params_3', 'params_4', 
+                          'fitness_1', 'fitness_2', 'hypervolume', 'gen']
+        mutate_log_df = pd.DataFrame(columns=mutate_log_col, index=None)
+        mutate_log_df.to_csv(mutate_log_path, index=False)
 
-    print(output_array.shape)
-    print(trytg_array.shape)
-    rms = sqrt(mean_squared_error(output_array, trytg_array))
-    print("Test RMSE:", rms)
+        def log_function(population, gen, hv=None, mutate_log_path=mutate_log_path):
+            for i in range(len(population)):
+                indiv = population[i]
+                if indiv == []:
+                    "non_mutated empty"
+                    pass
+                else:
+                    # print ("i: ", i)
+                    indiv.append(indiv.fitness.values[0])
+                    indiv.append(indiv.fitness.values[1])
+                    # append val_rmse
+                    indiv.append(hv)
+                    indiv.append(gen)
+
+            temp_df = pd.DataFrame(np.array(population), index=None)
+            temp_df.to_csv(mutate_log_path, mode='a', header=None)
+            print("population saved")
+            return
+
+
+
+    prft_path = os.path.join(directory_path, 'prft_out_ori_%s_%s_%s.csv' % (pop_size, n_generations, trial))
+
+
+
+    start = time.time()
+
+    cs = 0.0001
+
+    # Assign & run EA
+    task = SimpleNeuroEvolutionTask(
+        train_sample_array = train_sample_array,
+        train_label_array = train_label_array,
+        val_sample_array = val_sample_array,
+        val_label_array = val_label_array,
+        constant = cs,
+        epochs = ep,
+        batch=bs,
+        model_path = model_temp_path,
+        device = device,
+        obj = obj
+    )
+
+    # aic = task.evaluate(individual_seed)
+
+    ga = GeneticAlgorithm(
+        task=task,
+        population_size=pop_size,
+        n_generations=n_generations,
+        cx_probability=cx_prob,
+        mut_probability=mut_prob,
+        crossover_operator=cx_op,
+        mutation_operator=mut_op,
+        selection_operator=sel_op,
+        jobs=jobs,
+        log_function=log_function,
+        cs = cs,
+        **other_args
+    )
+
+    pop, log, hof, prtf = ga.run()
+
+    print("Best individual:")
+    print(hof[0])
+    print(prtf)
+
+    # Save to the txt file
+    # hof_filepath = tmp_path + "hof/best_params_fn-%s_ps-%s_ng-%s.txt" % (csv_filename, pop_size, n_generations)
+    # with open(hof_filepath, 'w') as f:
+    #     f.write(json.dumps(hof[0]))
+
+    print("Best individual is saved")
+    end = time.time()
+    print("EA time: ", end - start)
+    print ("####################  EA COMPLETE / HOF TEST   ##############################")
+
 
 
 if __name__ == '__main__':

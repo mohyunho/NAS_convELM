@@ -59,3 +59,9 @@ python3 fitness_curve.py --pop 30 --gen 30 --obj "soo"
 python3 -W ignore inference_convELM_manual.py -w 50 -s 50 -vs 0.2 --pop 20 --gen 20 -bs 1024 --obj "soo" -t 0
 
 python3 -W ignore inference_convELM_manual.py -w 50 -s 50 -vs 0.2 --pop 30 --gen 30 -bs 1024 --obj "soo" -t 0
+
+
+python3 -W ignore template_convELM.py -w 50 -s 50 -vs 0.2 --pop 20 --gen 20 -bs 256 --obj "soo" -t 2 -ep 200
+
+
+python3 -W ignore enas_convELM.py -w 50 -s 50 -vs 0.2 -ep 200 --pop 20 --gen 20 -bs 256 --obj "soo" -t 2
