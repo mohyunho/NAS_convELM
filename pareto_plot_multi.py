@@ -30,14 +30,23 @@ from sklearn import pipeline
 from sklearn.metrics import mean_squared_error
 from math import sqrt
 
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+
 from utils.pareto import pareto
 import matplotlib.pyplot as plt
 import matplotlib.figure
 import matplotlib.backends.backend_agg as agg
 import matplotlib.backends.backend_svg as svg
 
-pop_size = 28
-n_generations = 30
+pop_size = 20
+n_generations = 20
+subdata = "001"
+
+
+col_fit1 = "val_rmse"
+col_fit2 = "num_neuron"
+col_rmse = "test_rmse"
+col_score = "test_score"
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -60,170 +69,157 @@ results_lst = []
 prft_lst = []
 hv_trial_lst = []
 prft_trial_lst = []
+
+
 ########################################
+# Load log files
 for file in sorted(os.listdir(ea_log_path)):
-    if file.startswith("mute_log_28_30"):
+    if file.startswith("mute_log_ori_%s_%s_nsga2_%s" %(pop_size, n_generations, subdata)):
         print ("path1: ", file)
         mute_log_df = pd.read_csv(os.path.join(ea_log_path, file))
         results_lst.append(mute_log_df)
-    elif file.startswith("prft_out_28_30"):
+    elif file.startswith("prft_out_ori_%s_%s_nsga2_%s" %(pop_size, n_generations, subdata)):
         print("path2: ", file)
-        prft_log_df = pd.read_csv(os.path.join(ea_log_path, file), header=0, names=["p1", 'p2', 'p3', 'p4'])
+        # prft_log_df = pd.read_csv(os.path.join(ea_log_path, file), header=0, names=["p1", 'p2', 'p3', 'p4'])
+        prft_log_df = pd.read_csv(os.path.join(ea_log_path, file))
         prft_lst.append(prft_log_df)
 
 
 
+# Loop indepent runs
 
 for loop_idx in range(len(results_lst)):
     print ("file %s in progress..." %loop_idx)
     mute_log_df = results_lst[loop_idx]
     prft_log_df = prft_lst[loop_idx]
 
-    col_a = 'fitness_1'
-    col_b = 'fitness_2'
-    solutions_df = mute_log_df[['fitness_1', 'fitness_2']]
     prft_trial_lst.append(prft_log_df)
 
-    fit1_lst = []
-    fit2_lst = []
+
+    # sets = {}
+    # archives = {}
+
+    # fig = matplotlib.figure.Figure(figsize=(15, 15))
+    # agg.FigureCanvasAgg(fig)
+
+    # # print ("data", data)
+    # # print ("columns", data.columns)
+    # # print ("data.itertuples(False)", data.itertuples(False))
+    # resolution = 1e-4
+
+    # archives = pareto.eps_sort([prft_log_df.itertuples(False)], [0, 1], [resolution] * 2)
+    # # print ("archives", archives)
+    # # print ("sets", sets)
+
+    # spacing_x = 0.5
+    # spacing_y = 500
+
+    # fig = matplotlib.figure.Figure(figsize=(6, 6))
+    # agg.FigureCanvasAgg(fig)
+
+    # ax = fig.add_subplot(1, 1, 1)
+    # ax.scatter(prft_log_df[col_fit1], prft_log_df[col_fit2], facecolor=(1.0, 1.0, 0.4), edgecolors=(0.0, 0.0, 0.0), zorder=1,
+    #            s=50, label="Pareto front")
+
+    # x_max = 25
+    # y_max = 4000
+
+    # for box in archives.boxes:
+    #     ll = [box[0] * resolution, box[1] * resolution]
+
+    #     # make a rectangle in the Y direction
+    #     # rect = matplotlib.patches.Rectangle((ll[0], ll[1] + resolution), y_max - ll[0], y_max - ll[1], lw=1,
+    #     #                                     facecolor=(1.0, 0.8, 0.8), edgecolor=  (0.0,0.0,0.0), zorder=-10)
+    #     rect = matplotlib.patches.Rectangle((ll[0], ll[1] + resolution), y_max - ll[0], y_max - ll[1], lw=1,
+    #                                         facecolor=(1.0, 0.8, 0.8), zorder=-10)
+    #     ax.add_patch(rect)
+
+    #     # make a rectangle in the X direction
+    #     # rect = matplotlib.patches.Rectangle((ll[0] + resolution, ll[1]), x_max - ll[0], x_max - ll[1], lw=0,
+    #     #                                     facecolor=(1.0, 0.8, 0.8), zorder=-10)
+    #     ax.add_patch(rect)
+    # if resolution < 1e-3:
+    #     spacing = 0.1
+    # else:
+    #     spacing = resolution
+    #     while spacing < 0.2:
+    #         spacing *= 2
+
+    # x_range = np.arange(10, 25, spacing_x)
+    # ax.set_xticks(x_range)
+    # ax.set_xticklabels(x_range, rotation=60)
+    # ax.set_yticks(
+    #     np.arange(0, 4000, spacing_y))
+    # # ax.set_xticklabels(np.arange(round(min(data[col_a]), 1)-0.2, round(max(data[col_a]), 1)+0.2, spacing_x), rotation=60)
+    # # if resolution > 0.001:
+    # #     ax.hlines(np.arange(0, 1.4, resolution), 0, 1.4, colors=(0.1, 0.1, 0.1, 0.1), zorder=2)
+    # #     ax.vlines(np.arange(0, 1.4, resolution), 0, 1.4, colors=(0.1, 0.1, 0.1, 0.1), zorder=2)
+    # ax.set_xlim(10,25)
+    # ax.set_ylim(-500,4000)
+    # # ax.set_title("Solutions and pareto front", fontsize=15)
+    # ax.set_xlabel('Validation RMSE', fontsize=15)
+    # ax.set_ylabel('Trainable parameters', fontsize=15)
+    # ax.legend(fontsize=11)
+    # # fig.savefig(os.path.join(pic_dir, 'prft_auto_%s_%s_%s_t%s.png' % (pop_size, n_generations, subdata, loop_idx)), dpi=1500, bbox_inches='tight')
+    # # fig.savefig(os.path.join(pic_dir, 'prft_auto_%s_%s_%s_t%s.eps' % (pop_size, n_generations, subdata, loop_idx)), dpi=1500, bbox_inches='tight')
+
+    # #############################à
+
+    ####################
+    hv_lst = []
+    for gen in mute_log_df['gen'].unique():
+        if gen == 0:
+            pass
+        else:
+            hv_temp = mute_log_df.loc[mute_log_df['gen'] == gen]['hv'].values
+            hv_value = sum(hv_temp) / len(hv_temp)
+            hv_lst.append(hv_value)
+
+    offset_hv = [x - min(hv_lst) for x in hv_lst]
+    norm_hv = [x / (max(offset_hv) + 1) for x in offset_hv]
+    hv_trial_lst.append(norm_hv)
+    print(norm_hv)
 
 
-    for index, p_ind in prft_log_df.iterrows():
-        # print ("index", index)
-        # print ("p_ind", p_ind)
-        # print ("p_ind['p1']", p_ind['p1'])
-        log_prft_ind = mute_log_df.loc[(mute_log_df['params_1'] == p_ind['p1']) &
-                                       (mute_log_df['params_2'] == p_ind['p2']) &
-                                       (mute_log_df['params_3'] == p_ind['p3']) &
-                                       (mute_log_df['params_4'] == p_ind['p4'])]
-
-        fit1_lst.append(log_prft_ind[col_a].values[0])
-        fit2_lst.append(log_prft_ind[col_b].values[0])
 
 
-    prft_log_df[col_a] = fit1_lst
-    prft_log_df[col_b] = fit2_lst
 
-#     #############################à
-#     data = solutions_df
-#
-#     sets = {}
-#     archives = {}
-#
-#     fig = matplotlib.figure.Figure(figsize=(15, 15))
-#     agg.FigureCanvasAgg(fig)
-#
-#     # print ("data", data)
-#     # print ("columns", data.columns)
-#     # print ("data.itertuples(False)", data.itertuples(False))
-#     resolution = 1e-4
-#
-#     archives = pareto.eps_sort([data.itertuples(False)], [0, 1], [resolution] * 2)
-#     # print ("archives", archives)
-#     # print ("sets", sets)
-#
-#     spacing_x = 0.5
-#     spacing_y = 500
-#
-#     fig = matplotlib.figure.Figure(figsize=(6, 6))
-#     agg.FigureCanvasAgg(fig)
-#
-#     ax = fig.add_subplot(1, 1, 1)
-#     ax.scatter(data[col_a], data[col_b], lw=0, facecolor=(0.7, 0.7, 0.7), zorder=-1, label="All solutions")
-#     ax.scatter(prft_log_df[col_a], prft_log_df[col_b], facecolor=(1.0, 1.0, 0.4), edgecolors=(0.0, 0.0, 0.0), zorder=1,
-#                s=50, label="Pareto front")
-#
-#     x_max = 13
-#     y_max = 4000
-#
-#     for box in archives.boxes:
-#         ll = [box[0] * resolution, box[1] * resolution]
-#
-#         # make a rectangle in the Y direction
-#         # rect = matplotlib.patches.Rectangle((ll[0], ll[1] + resolution), y_max - ll[0], y_max - ll[1], lw=1,
-#         #                                     facecolor=(1.0, 0.8, 0.8), edgecolor=  (0.0,0.0,0.0), zorder=-10)
-#         rect = matplotlib.patches.Rectangle((ll[0], ll[1] + resolution), y_max - ll[0], y_max - ll[1], lw=1,
-#                                             facecolor=(1.0, 0.8, 0.8), zorder=-10)
-#         ax.add_patch(rect)
-#
-#         # make a rectangle in the X direction
-#         # rect = matplotlib.patches.Rectangle((ll[0] + resolution, ll[1]), x_max - ll[0], x_max - ll[1], lw=0,
-#         #                                     facecolor=(1.0, 0.8, 0.8), zorder=-10)
-#         ax.add_patch(rect)
-#     if resolution < 1e-3:
-#         spacing = 0.1
-#     else:
-#         spacing = resolution
-#         while spacing < 0.2:
-#             spacing *= 2
-#
-#     x_range = np.arange(6, 13, spacing_x)
-#     ax.set_xticks(x_range)
-#     ax.set_xticklabels(x_range, rotation=60)
-#     ax.set_yticks(
-#         np.arange(0, 4000, spacing_y))
-#     # ax.set_xticklabels(np.arange(round(min(data[col_a]), 1)-0.2, round(max(data[col_a]), 1)+0.2, spacing_x), rotation=60)
-#     # if resolution > 0.001:
-#     #     ax.hlines(np.arange(0, 1.4, resolution), 0, 1.4, colors=(0.1, 0.1, 0.1, 0.1), zorder=2)
-#     #     ax.vlines(np.arange(0, 1.4, resolution), 0, 1.4, colors=(0.1, 0.1, 0.1, 0.1), zorder=2)
-#     ax.set_xlim(6,13)
-#     ax.set_ylim(-500,4000)
-#     # ax.set_title("Solutions and pareto front", fontsize=15)
-#     ax.set_xlabel('Validation RMSE', fontsize=15)
-#     ax.set_ylabel('Trainable parameters', fontsize=15)
-#     ax.legend(fontsize=11)
-#     fig.savefig(os.path.join(pic_dir, 'prft_auto_%s_%s_t%s.png' % (pop_size, n_generations, loop_idx)), dpi=1500, bbox_inches='tight')
-#     fig.savefig(os.path.join(pic_dir, 'prft_auto_%s_%s_t%s.eps' % (pop_size, n_generations, loop_idx)), dpi=1500, bbox_inches='tight')
-#
-#     #############################à
-#
-#     ####################
-#     hv_lst = []
-#     for gen in mute_log_df['gen'].unique():
-#         hv_temp = mute_log_df.loc[mute_log_df['gen'] == gen]['hypervolume'].values
-#         hv_value = sum(hv_temp) / len(hv_temp)
-#         hv_lst.append(hv_value)
-#
-#     offset_hv = [x - min(hv_lst) for x in hv_lst]
-#     norm_hv = [x / (max(offset_hv) + 1) for x in offset_hv]
-#     hv_trial_lst.append(norm_hv)
-#     # print(norm_hv)
-#
-#
-# hv_gen = np.stack(hv_trial_lst)
-# hv_gen_lst = []
-# for gen in range(hv_gen.shape[1]):
-#     hv_temp =hv_gen[:,gen]
-#     hv_gen_lst.append(hv_temp)
-#
-# # print (hv_gen_lst)
-# # print (len(hv_gen_lst))
-# fig_verify = plt.figure(figsize=(7, 5))
-# mean_hv = np.array([np.mean(a) for a in hv_gen_lst])
-# std_hv = np.array([np.std(a) for a in hv_gen_lst])
-# x_ref = range(1, n_generations + 1)
-# plt.plot(x_ref, mean_hv, color='red', linewidth=1, label = 'Mean')
-#
-# plt.fill_between(x_ref, mean_hv-std_hv, mean_hv+std_hv,
-#     alpha=0.15, facecolor=(1.0, 0.8, 0.8))
-#
-# plt.plot(x_ref, mean_hv-std_hv, color='black', linewidth= 0.5, linestyle='dashed')
-# plt.plot(x_ref, mean_hv+std_hv, color='black', linewidth= 0.5, linestyle='dashed', label = 'Std')
-# plt.xticks(x_ref, fontsize=10, rotation=60)
-# plt.yticks(fontsize=11)
-# plt.ylabel("Normalized hypervolume", fontsize=16)
-# plt.xlabel("Generations", fontsize=16)
-# plt.legend(loc='lower right', fontsize=15)
-# fig_verify.savefig(os.path.join(pic_dir, 'hv_plot_%s_%s.png' % (pop_size, n_generations)), dpi=1500,
-#                    bbox_inches='tight')
-# fig_verify.savefig(os.path.join(pic_dir, 'hv_plot_%s_%s.eps' % (pop_size, n_generations)), dpi=1500,
-#                    bbox_inches='tight')
+hv_gen = np.stack(hv_trial_lst)
+hv_gen_lst = []
+for gen in range(hv_gen.shape[1]):
+    hv_temp =hv_gen[:,gen]
+    hv_gen_lst.append(hv_temp)
+
+# print (hv_gen_lst)
+# print (len(hv_gen_lst))
+fig_verify = plt.figure(figsize=(7, 5))
+mean_hv = np.array([np.mean(a) for a in hv_gen_lst])
+std_hv = np.array([np.std(a) for a in hv_gen_lst])
+print ("std_hv", std_hv)
+x_ref = range(1, n_generations + 1)
+plt.plot(x_ref, mean_hv, color='red', linewidth=1, label = 'Mean')
+
+plt.fill_between(x_ref, mean_hv-std_hv, mean_hv+std_hv,
+    alpha=0.25, facecolor=(1.0, 0.8, 0.8))
+
+plt.plot(x_ref, mean_hv-std_hv, color='black', linewidth= 0.5, linestyle='dashed')
+plt.plot(x_ref, mean_hv+std_hv, color='black', linewidth= 0.5, linestyle='dashed', label = 'Std')
+plt.xticks(x_ref, fontsize=10, rotation=60)
+plt.yticks(fontsize=11)
+plt.ylabel("Normalized hypervolume", fontsize=16)
+plt.xlabel("Generations", fontsize=16)
+plt.legend(loc='lower right', fontsize=15)
+fig_verify.savefig(os.path.join(pic_dir, 'hv_plot_%s_%s_%s.png' % (pop_size, n_generations, subdata)), dpi=1500,
+                   bbox_inches='tight')
+fig_verify.savefig(os.path.join(pic_dir, 'hv_plot_%s_%s_%s.eps' % (pop_size, n_generations, subdata)), dpi=1500,
+                   bbox_inches='tight')
+
+
 
 
 
 ########################################
-spacing_x = 0.5
-spacing_y = 500
+
 cycol = cycle('bgrcmk')
 
 def get_cmap(n, name='hsv'):
@@ -233,15 +229,14 @@ def get_cmap(n, name='hsv'):
 
 
 
-x_max = 11
-x_min = 6
+x_max = 25
+x_min = 15
 y_max = 4000
 y_min = 0
-x_sp = 0.25
+x_sp = 0.5
 y_sp = 200
-
-
-
+spacing_x = x_sp
+spacing_y = y_sp
 
 
 ############################### Histogram
@@ -255,9 +250,9 @@ y_bin = []
 print (prft_all)
 counter = 0
 for idx in range(int((x_max - x_min)/x_sp)) :
-    df_fit1 = prft_all.loc[(x_min+idx*x_sp <prft_all[col_a])& (prft_all[col_a]<x_min+(idx+1)*x_sp)]
+    df_fit1 = prft_all.loc[(x_min+idx*x_sp <prft_all[col_fit1])& (prft_all[col_fit1]<x_min+(idx+1)*x_sp)]
     for loop in range(int((y_max - y_min)/y_sp)):
-        df_fit_temp = df_fit1.loc[(y_min + loop * y_sp < df_fit1[col_b]) & (df_fit1[col_b] < y_min + (loop + 1) * y_sp)]
+        df_fit_temp = df_fit1.loc[(y_min + loop * y_sp < df_fit1[col_fit2]) & (df_fit1[col_fit2] < y_min + (loop + 1) * y_sp)]
         # print ("idx", idx)
         # print ("loop", loop)
         # print (df_fit_temp)
@@ -289,11 +284,10 @@ agg.FigureCanvasAgg(fig)
 cmap = get_cmap(len(prft_trial_lst))
 ax = fig.add_subplot(1, 1, 1)
 for idx, prft in enumerate(prft_trial_lst):
-    # ax.scatter(data[col_a], data[col_b], lw=0, facecolor=(0.7, 0.7, 0.7), zorder=-1, label="All solutions")
-    ax.scatter(prft[col_a], prft[col_b], facecolor=(1.0, 1.0, 0.4), edgecolors=(0.0, 0.0, 0.0), zorder=1, c=cmap(idx),
+    ax.scatter(prft[col_fit1], prft[col_fit2], facecolor=(1.0, 1.0, 0.4), edgecolors=(0.0, 0.0, 0.0), zorder=1, c=cmap(idx),
                s=20, label="Trial %s" %(idx+1), alpha=0.5)
-ax.hlines(np.arange(y_min, y_max, y_sp), 0, 13, lw= 0.5, colors=(0.5, 0.5, 0.5, 0.5), zorder=2)
-ax.vlines(np.arange(x_min, x_max, x_sp), 0, 4000, lw= 0.5, colors=(0.5, 0.5, 0.5, 0.5), zorder=2)
+ax.hlines(np.arange(y_min, y_max, y_sp), 0, x_max, lw= 0.5, colors=(0.5, 0.5, 0.5, 0.5), zorder=2)
+ax.vlines(np.arange(x_min, x_max, x_sp), 0, y_max, lw= 0.5, colors=(0.5, 0.5, 0.5, 0.5), zorder=2)
 
 rect = matplotlib.patches.Rectangle((x_bin[max_idx],y_bin[max_idx]), x_sp, y_sp, lw=2, facecolor=(0.8, 0.8, 0.1),
                                     alpha = 0.8, edgecolor=  (0.9,0.9,0.1), zorder=1)
@@ -301,11 +295,11 @@ rect = matplotlib.patches.Rectangle((x_bin[max_idx],y_bin[max_idx]), x_sp, y_sp,
 # rect = matplotlib.patches.Rectangle((x_bin[max_idx],y_bin[max_idx]), x_sp, y_sp, lw=2, fill=None,
 #                                     edgecolor=  (1.0,0.9,0.1), zorder=1)
 ax.add_patch(rect)
-x_range = np.arange(x_min, x_max, spacing_x)
+x_range = np.arange(x_min, x_max + x_sp, x_sp)
 ax.set_xticks(x_range)
 ax.set_xticklabels(x_range, rotation=60)
 ax.set_yticks(
-    np.arange(y_min, y_max, spacing_y))
+    np.arange(y_min, y_max + y_sp, spacing_y))
 # ax.set_xticklabels(np.arange(round(min(data[col_a]), 1)-0.2, round(max(data[col_a]), 1)+0.2, spacing_x), rotation=60)
 # if resolution > 0.001:
 #     ax.hlines(np.arange(0, 1.4, resolution), 0, 1.4, colors=(0.1, 0.1, 0.1, 0.1), zorder=2)
@@ -317,9 +311,9 @@ ax.set_xlabel('Validation RMSE', fontsize=15)
 ax.set_ylabel('Trainable parameters', fontsize=15)
 ax.legend(fontsize=11)
 # ax.set_rasterized(True)
-fig.savefig(os.path.join(pic_dir, 'prft_aggr_%s_%s.png' % (pop_size, n_generations)), dpi=1500, bbox_inches='tight')
-fig.savefig(os.path.join(pic_dir, 'prft_aggr_%s_%s.eps' % (pop_size, n_generations)), dpi=1500, bbox_inches='tight')
-fig.savefig(os.path.join(pic_dir, 'prft_aggr_%s_%s.pdf' % (pop_size, n_generations)), dpi=1500, bbox_inches='tight')
+fig.savefig(os.path.join(pic_dir, 'prft_aggr_%s_%s_%s.png' % (pop_size, n_generations, subdata)), dpi=1500, bbox_inches='tight')
+# fig.savefig(os.path.join(pic_dir, 'prft_aggr_%s_%s_%s.eps' % (pop_size, n_generations, subdata)), dpi=1500, bbox_inches='tight')
+# fig.savefig(os.path.join(pic_dir, 'prft_aggr_%s_%s_%s.pdf' % (pop_size, n_generations, subdata)), dpi=1500, bbox_inches='tight')
 
 fig_verify = plt.figure(figsize=(6, 4))
 plt.bar(x, width=0.8, color= 'r',height=fit_hist_array)
@@ -327,8 +321,8 @@ plt.xticks([max_idx], ["fit1: [%s,%s]" %(x_bin[max_idx], x_bin[max_idx]+x_sp) + 
 plt.ylabel("Counts", fontsize=15)
 plt.xlabel("Bins", fontsize=15)
 # plt.show()
-fig_verify.savefig(os.path.join(pic_dir, 'hist_%s_%s.png' % (pop_size, n_generations)), dpi=1500, bbox_inches='tight')
-fig_verify.savefig(os.path.join(pic_dir, 'hist_%s_%s.eps' % (pop_size, n_generations)), dpi=1500, bbox_inches='tight')
+fig_verify.savefig(os.path.join(pic_dir, 'hist_%s_%s_%s.png' % (pop_size, n_generations, subdata)), dpi=1500, bbox_inches='tight')
+# fig_verify.savefig(os.path.join(pic_dir, 'hist_%s_%s_%s.eps' % (pop_size, n_generations, subdata)), dpi=1500, bbox_inches='tight')
 # fit1_all_lst = prft_all[:,4].tolist()
 # fit2_all_lst = prft_all[:,5].tolist()
 #
@@ -339,55 +333,133 @@ fig_verify.savefig(os.path.join(pic_dir, 'hist_%s_%s.eps' % (pop_size, n_generat
 #     fit1_hist_array[idx] = fit1_hist_array[idx] +  count
 #
 # print (fit1_hist_array)
-results_df = pd.read_csv(os.path.join(ea_log_path, "results.csv"))
-cnn_solution = [6.29, 5722]
-ga_elm1 = [7.29, 3310]
-ga_elm2 = [7.22, 1790]
-selected_prft = prft_all.loc[(prft_all[col_a] > x_bin[max_idx]) & (prft_all[col_a] < x_bin[max_idx] + x_sp)
-                             & (prft_all[col_b] > y_bin[max_idx])
-                             & (prft_all[col_b] < y_bin[max_idx] + y_sp)]
-print ("selected_prft", selected_prft)
-print ("results_df", results_df)
-results_df["params"] = selected_prft["fitness_2"].values
 
-fig_results = plt.figure(figsize=(6, 4))
+
+
+elm_selected_df = pd.read_csv(os.path.join(ea_log_path, "elm_selected_ind_%s_%s_%s.csv" %(pop_size, n_generations, subdata)))
+
+
+
+mlp_solution = [37.36, 801]
+cnn_solution = [18.45, 6815]
+lstm_solution  = [16.14, 14681]
+hrs_ref = 3600
+
+
+selected_prft = prft_all.loc[(prft_all[col_fit1] > x_bin[max_idx]) & (prft_all[col_fit1] < x_bin[max_idx] + x_sp)
+                             & (prft_all[col_fit2] > y_bin[max_idx])
+                             & (prft_all[col_fit2] < y_bin[max_idx] + y_sp)]
+print ("selected_prft", selected_prft)
+
+
+fig_results = plt.figure(figsize=(3.5, 3.5))
 
 cmap = get_cmap(2)
 ax = fig_results.add_subplot(1, 1, 1)
 
+ax.scatter(mlp_solution[0], mlp_solution[1], marker="p",facecolor=(0.9, 0.5, 0.0), edgecolors=(0.0, 0.0, 0.0), zorder=1,
+           s=60, label="MLP")
 ax.scatter(cnn_solution[0], cnn_solution[1], marker="D",facecolor=(0.0, 1.0, 0.0), edgecolors=(0.0, 0.0, 0.0), zorder=1,
            s=60, label="CNN")
-ax.scatter(ga_elm1[0], ga_elm1[1], marker="^",facecolor=(0.0, 0.0, 1.0), edgecolors=(0.0, 0.0, 0.0), zorder=1,
-           s=60, label="GA+ELM(1)")
-ax.scatter(ga_elm2[0], ga_elm2[1], marker="s",facecolor=(0.0, 0.0, 0.0), edgecolors=(0.0, 0.0, 0.0), zorder=1,
-           s=60, label="GA+ELM(2)")
-ax.scatter(results_df["rmse"], results_df["params"], facecolor=(1.0,1.0,0.0), edgecolors=(0.7, 0.7, 0.0), zorder=1,
-           s=60, label="MOO+ELM", alpha=0.7)
-ax.scatter(results_df["rmse"].mean(), results_df["params"].mean(),  marker="x",facecolor=(1.0,0.0,0.0),  edgecolors=(0.0, 0.0, 0.0), zorder=5,
-           s=80, label="MOO+ELM(avg)", alpha=1)
+ax.scatter(lstm_solution[0], lstm_solution[1], marker="v",facecolor=(0.0, 1.0, 1.0), edgecolors=(0.0, 0.0, 0.0), zorder=1,
+           s=60, label="LSTM")
+ax.scatter(elm_selected_df["test_rmse"], elm_selected_df["num_neuron"], facecolor=(1,0.8,0.89), edgecolors=(0.2, 0.2, 0.2), zorder=1,
+           s=60, label="ELM", alpha=0.3)
+ax.scatter(elm_selected_df["test_rmse"].mean(), elm_selected_df["num_neuron"].mean(),  marker="s",facecolor=(1.0,0.0,1.0),  edgecolors=(0.0, 0.0, 0.0), zorder=5,
+           s=60, label="ELM(avg)", alpha=0.7)
+ax.scatter(selected_prft["test_rmse"], selected_prft["num_neuron"], facecolor=(1.0,1.0,0.0), edgecolors=(0.7, 0.7, 0.0), zorder=1,
+           s=60, label="Conv. ELM", alpha=0.7)
+ax.scatter(selected_prft["test_rmse"].mean(), selected_prft["num_neuron"].mean(),  marker="x",facecolor=(1.0,0.0,0.0),  edgecolors=(0.0, 0.0, 0.0), zorder=5,
+           s=60, label="Conv. ELM(avg)", alpha=1)
 
-print ("results_df.mean() rmse", results_df["rmse"].mean())
-print ("results_df.mean() params", results_df["params"].mean())
-print ("results_df.mean() p2", selected_prft["p2"].mean())
-print ("results_df.mean() p3", selected_prft["p3"].mean())
-print ("results_df.mean() f1", selected_prft["fitness_1"].mean())
-print ("results_df.mean() f2", selected_prft["fitness_2"].mean())
 
-x_range = np.arange(x_min, 10, spacing_x)
+# moo_time_sec = [22000, 21000 ]
+# moo_time_hrs = [x / hrs_ref for x in moo_time_sec]
+# moo_time_avg = np.std(moo_time_hrs)
+# moo_time_std = np.mean(moo_time_hrs)
+# print ("moo_time_avg", moo_time_avg)
+# print ("moo_time_std", moo_time_std)
+
+tickfontsize = 6
+
+x_range = np.arange(x_min, 41, x_sp*2)
 ax.set_xticks(x_range)
-ax.set_xticklabels(x_range, rotation=60)
-ax.set_yticks(
-    np.arange(y_min, 6000, spacing_y))
-# ax.set_xticklabels(np.arange(round(min(data[col_a]), 1)-0.2, round(max(data[col_a]), 1)+0.2, spacing_x), rotation=60)
-# if resolution > 0.001:
-#     ax.hlines(np.arange(0, 1.4, resolution), 0, 1.4, colors=(0.1, 0.1, 0.1, 0.1), zorder=2)
-#     ax.vlines(np.arange(0, 1.4, resolution), 0, 1.4, colors=(0.1, 0.1, 0.1, 0.1), zorder=2)
-ax.set_xlim(x_min,10)
-ax.set_ylim(0,6000)
+ax.set_xticklabels(x_range,  fontsize=tickfontsize, rotation=60)
+
+ax.set_xlim(x_min,41)
+# ax.set_ylim(0,6000)
 # ax.set_title("Solutions and pareto front", fontsize=15)
-ax.set_xlabel('Test RMSE', fontsize=15)
-ax.set_ylabel('Trainable parameters', fontsize=15)
-ax.legend(fontsize=11)
-fig_results.savefig(os.path.join(pic_dir, 'results_%s_%s.png' % (pop_size, n_generations)), dpi=500, bbox_inches='tight')
-fig_results.savefig(os.path.join(pic_dir, 'results_%s_%s.eps' % (pop_size, n_generations)), dpi=500, bbox_inches='tight')
-fig_results.savefig(os.path.join(pic_dir, 'results_%s_%s.pdf' % (pop_size, n_generations)), dpi=500, bbox_inches='tight')
+
+
+# ax.set_yscale('log')
+
+# exp = lambda x: 100**(x)
+# log = lambda x: np.log100(x)
+
+ax.set_yscale('linear')
+ax.set_ylim((0, 8500))
+
+y_range = np.arange(0, 8500, 500)
+ax.set_yticks(y_range)
+ax.set_yticklabels(y_range,  fontsize=tickfontsize)
+
+ax.tick_params(axis='both', labelsize=tickfontsize)
+
+
+
+ax.spines['top'].set_visible(False)
+ax.xaxis.set_ticks_position('bottom')
+
+divider = make_axes_locatable(ax)
+axLin = divider.append_axes("top", size=0.5, pad=0, sharex=ax)
+# ax.set_xticklabels(x_range,  fontsize=5, rotation=60)
+
+axLin.tick_params(axis='both', which='minor', labelsize=tickfontsize)
+
+
+axLin.scatter(mlp_solution[0], mlp_solution[1], marker="p",facecolor=(0.9, 0.5, 0.0), edgecolors=(0.0, 0.0, 0.0), zorder=1,
+           s=50, label="MLP")
+axLin.scatter(cnn_solution[0], cnn_solution[1], marker="D",facecolor=(0.0, 1.0, 0.0), edgecolors=(0.0, 0.0, 0.0), zorder=1,
+           s=50, label="CNN")
+axLin.scatter(lstm_solution[0], lstm_solution[1], marker="v",facecolor=(0.0, 1.0, 1.0), edgecolors=(0.0, 0.0, 0.0), zorder=1,
+           s=50, label="LSTM")
+axLin.scatter(elm_selected_df["test_rmse"], elm_selected_df["num_neuron"], facecolor=(1,0.8,0.89), edgecolors=(0.2, 0.2, 0.2), zorder=1,
+           s=60, label="ELM", alpha=0.3)
+axLin.scatter(elm_selected_df["test_rmse"].mean(), elm_selected_df["num_neuron"].mean(),  marker="s",facecolor=(1.0,0.0,1.0),  edgecolors=(0.0, 0.0, 0.0), zorder=5,
+           s=60, label="ELM(avg)", alpha=0.7)
+axLin.scatter(selected_prft["test_rmse"], selected_prft["num_neuron"], facecolor=(1.0,1.0,0.0), edgecolors=(0.7, 0.7, 0.0), zorder=1,
+           s=60, label="Conv. ELM", alpha=0.7)
+axLin.scatter(selected_prft["test_rmse"].mean(), selected_prft["num_neuron"].mean(),  marker="x",facecolor=(1.0,0.0,0.0),  edgecolors=(0.0, 0.0, 0.0), zorder=5,
+           s=60, label="Conv. ELM(avg)", alpha=1)
+
+
+axLin.set_yscale('log')
+
+# axLin.set_yscale('function', functions=(exp, log))
+axLin.set_ylim((10000, 20000))
+# axLin.plot(np.sin(xdomain), xdomain)
+# axLin.spines['right'].set_visible(False)
+# axLin.yaxis.set_ticks_position('left')
+# plt.setp(axLin.get_xticklabels(), visible=True)
+
+
+labels = [tick.get_text() for tick in axLin.get_yticklabels()]
+print ("labels", labels)
+# labels[0]= '10^5'
+# # ax2.set_yticklabels(labels)
+# print ("labels", labels)
+# # axLin.set_yticklabels(labels[1:])
+# axLin.set_yticklabels(labels)
+
+
+axLin.spines['bottom'].set_visible(False)
+axLin.xaxis.set_ticks_position('none')
+plt.setp(axLin.get_xticklabels(), visible=False)
+ax.set_xlabel('Test RMSE', fontsize=11)
+# plt.ylabel('Trainable parameters', fontsize=12)
+ax.set_ylabel('          Trainable parameters', fontsize=11)
+plt.legend(fontsize=8)
+
+fig_results.savefig(os.path.join(pic_dir, 'results_%s_%s_%s.png' % (pop_size, n_generations, subdata)), dpi=500, bbox_inches='tight')
+fig_results.savefig(os.path.join(pic_dir, 'results_%s_%s_%s.eps' % (pop_size, n_generations, subdata)), dpi=500, bbox_inches='tight')
+fig_results.savefig(os.path.join(pic_dir, 'results_%s_%s_%s.pdf' % (pop_size, n_generations, subdata)), bbox_inches='tight')

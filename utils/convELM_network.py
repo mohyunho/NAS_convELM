@@ -31,14 +31,7 @@ from torchvision import datasets, transforms
 from torch.autograd import Variable
 from utils.pseudoInverse import pseudoInverse
 
-seed = 0
 
-torch.backends.cudnn.deterministic = True
-torch.backends.cudnn.benchmark = False
-torch.manual_seed(seed)
-torch.cuda.manual_seed_all(seed)
-np.random.seed(seed)
-random.seed(seed)
 
 
 print ("torch.cuda.is_available()", torch.cuda.is_available())
@@ -49,6 +42,7 @@ tempdir = os.path.join(current_dir, 'temp')
 def score_calculator(y_predicted, y_actual):
     # Score metric
     h_array = y_predicted - y_actual
+    # print ("h_array", h_array)
     s_array = np.zeros(len(h_array))
     for j, h_j in enumerate(h_array):
         if h_j < 0:
@@ -65,8 +59,18 @@ class ConvElm(nn.Module):
     '''
     class for network
     '''
-    def __init__(self, feat_len, win_len, conv1_ch_mul, conv1_kernel_size, conv2_ch_mul, conv2_kernel_size, conv3_ch_mul, conv3_kernel_size, l2_parm, model_path):
+    def __init__(self, feat_len, win_len, conv1_ch_mul, conv1_kernel_size, conv2_ch_mul, conv2_kernel_size, conv3_ch_mul, conv3_kernel_size, fc_mul, l2_parm, model_path, trial):
         super(ConvElm, self).__init__()
+
+        self.trial = trial
+        seed = self.trial
+
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+        torch.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
+        np.random.seed(seed)
+        random.seed(seed)
 
         self.feat_len = feat_len
         self.win_len = win_len
@@ -81,47 +85,51 @@ class ConvElm(nn.Module):
         self.conv3_ch_mul = conv3_ch_mul
         self.conv3_kernel_size = conv3_kernel_size
 
+        self.fc_mul = fc_mul
+
         self.lin_input_len = feat_len*conv1_ch_mul*conv2_ch_mul
         # self.lin_mul = lin_mul
     
         self.l2_parm = l2_parm
         self.model_path = model_path
 
-        self.conv1 = nn.Conv1d(self.feat_len, self.feat_len*self.conv1_ch_mul , kernel_size=self.conv1_kernel_size, padding='same')
-        self.conv2 = nn.Conv1d(self.conv2_input_ch, self.conv2_input_ch*self.conv2_ch_mul, kernel_size=self.conv2_kernel_size, padding='same')
-        self.conv3 = nn.Conv1d(self.conv3_input_ch, self.conv3_input_ch*self.conv3_ch_mul, kernel_size=self.conv3_kernel_size, padding='same')
+        self.conv1 = nn.Conv1d(self.feat_len, 10*self.conv1_ch_mul , kernel_size=self.conv1_kernel_size, padding='same')
+        self.conv2 = nn.Conv1d(10*self.conv1_ch_mul, 10*self.conv2_ch_mul, kernel_size=self.conv2_kernel_size, padding='same')
+        self.conv3 = nn.Conv1d(10*self.conv2_ch_mul, 10*self.conv3_ch_mul, kernel_size=self.conv3_kernel_size, padding='same')
 
-        flatten_width = self.conv3_input_ch*self.conv3_ch_mul * round(self.win_len/8)
+        flatten_width = 10*self.conv3_ch_mul * round(self.win_len)
 
         print ("flatten_width", flatten_width)
 
-        # self.fc1 = nn.Linear(flatten_width, 50)
-        self.fc2 = nn.Linear(flatten_width, 1, bias=False)
+        self.num_hidden_neurons = 50*self.fc_mul
 
-        torch.nn.init.xavier_normal_(self.conv1.weight)
-        torch.nn.init.xavier_normal_(self.conv2.weight)
-        torch.nn.init.xavier_normal_(self.conv3.weight)
+        self.fc1 = nn.Linear(flatten_width, self.num_hidden_neurons)
+        self.fc2 = nn.Linear(self.num_hidden_neurons, 1, bias=False)
+
+        # torch.nn.init.xavier_normal_(self.conv1.weight)
+        # torch.nn.init.xavier_normal_(self.conv2.weight)
+        # torch.nn.init.xavier_normal_(self.conv3.weight)
         # torch.nn.init.xavier_normal_(self.fc1.weight)
-        torch.nn.init.xavier_normal_(self.fc2.weight)
+        # torch.nn.init.xavier_normal_(self.fc2.weight)
 
 
 
     def forward(self, x):
         x = self.conv1(x)
-        x = F.max_pool1d(x,kernel_size=2)
+        # x = F.max_pool1d(x,kernel_size=2)
         x = F.relu(x)
         x = self.conv2(x)
-        x = F.max_pool1d(x,kernel_size=2)
+        # x = F.max_pool1d(x,kernel_size=2)
         x = F.relu(x)
         x = self.conv3(x)
-        x = F.max_pool1d(x,kernel_size=2)
+        # x = F.max_pool1d(x,kernel_size=2)
         x = F.relu(x)
         
         # x = x.view(-1, self.num_flat_features(x))
         x = torch.flatten(x, start_dim=1)
 
-        # x = self.fc1(x)
-        # x = F.relu(x)
+        x = self.fc1(x)
+        x = F.relu(x)
 
 
         x = self.fc2(x)
@@ -133,13 +141,13 @@ class ConvElm(nn.Module):
 
     def forwardToHidden(self, x):
         x = self.conv1(x)
-        x = F.max_pool1d(x,kernel_size=2)
+        # x = F.max_pool1d(x,kernel_size=2)
         x = F.relu(x)
         x = self.conv2(x)
-        x = F.max_pool1d(x,kernel_size=2)
+        # x = F.max_pool1d(x,kernel_size=2)
         x = F.relu(x)
         x = self.conv3(x)
-        x = F.max_pool1d(x,kernel_size=2)
+        # x = F.max_pool1d(x,kernel_size=2)
         x = F.relu(x)
 
 
@@ -147,8 +155,8 @@ class ConvElm(nn.Module):
         x = torch.flatten(x, start_dim=1)
 
 
-        #x = self.fc1(x)
-        #x = F.relu(x)
+        x = self.fc1(x)
+        x = F.relu(x)
 
         return x
 
@@ -189,7 +197,7 @@ def backprop(train_sample_array, train_label_array, model, loss_fn, optimizer):
 def train_loop(train_sample_array, train_label_array, model, loss_fn, optimizer):
     model.train()
     size = len(train_sample_array)    
-    print ("len(train_sample_array)", len(train_sample_array))
+    # print ("len(train_sample_array)", len(train_sample_array))
 
     if len(train_sample_array) == 1:
         hiddenOut = model.forwardToHidden(train_sample_array[0])
@@ -268,6 +276,57 @@ def test_loop(val_sample_array, val_label_array, model, loss_fn):
     print ("Validation RMSE: ", rms)
 
 
+def train_loop_return(val_sample_array, val_label_array, model, loss_fn):
+
+    model.train(False)
+    size = len(val_sample_array)
+    num_batches = len(val_sample_array)
+    test_loss = 0
+    output_lst  = []
+    val_label_lst = []
+    with torch.no_grad():
+        if len(val_sample_array) == 1:
+            pred = model(val_sample_array[0])
+            pred = pred.flatten() 
+
+            y = val_label_array[0]
+
+            pred = pred.cpu().data.numpy()
+            y = y.cpu().data.numpy()
+            y = y.reshape(len(y),1)
+            output_lst.append(pred)
+            val_label_lst.append(y)
+
+        else:
+            for val_batch_idx, val_batch in enumerate(val_sample_array):
+                pred = model(val_batch)
+
+                pred = pred.flatten() 
+
+                y = val_label_array[val_batch_idx]
+                # test_loss += loss_fn(pred, y).item()
+
+                pred = pred.cpu().data.numpy()
+                y = y.cpu().data.numpy()
+                y = y.reshape(len(y),1)
+                output_lst.append(pred)
+                val_label_lst.append(y)
+
+        output = np.concatenate(output_lst, axis=0)
+        val_target_data = np.concatenate(val_label_lst,axis=0)  
+        val_target_data = val_target_data.flatten() 
+
+        rms = sqrt(mean_squared_error(output, val_target_data))
+        rms = round(rms, 2)
+
+
+        
+    test_loss /= num_batches
+    print ("RMSE: ", rms)
+
+    return rms
+
+
 def test_loop_return(val_sample_array, val_label_array, model, loss_fn):
 
     model.train(False)
@@ -306,18 +365,77 @@ def test_loop_return(val_sample_array, val_label_array, model, loss_fn):
 
         output = np.concatenate(output_lst, axis=0)
         val_target_data = np.concatenate(val_label_lst,axis=0)  
+        val_target_data = val_target_data.flatten() 
 
         rms = sqrt(mean_squared_error(output, val_target_data))
         rms = round(rms, 2)
+
+
+
+        score = score_calculator(output, val_target_data)
+        score = round(score, 2)
+
         
     test_loss /= num_batches
-    print ("Validation RMSE: ", rms)
+    print ("RMSE: ", rms)
+    print ("Score: ", score)
 
-    return rms
+    return rms, score
 
 
 
 def train_net(model, train_sample_array, train_label_array, val_sample_array, val_label_array, l2_parm, epochs, device):
+    '''
+    specify the optimizers and train the network
+    :param epochs:
+    :param batch_size:
+    :param lr:
+    :return:
+    '''
+    # print ("device", device)
+    print("Initializing network...")
+
+       
+    
+    # print ("model", model)
+    # print ("model.parameters()", model.parameters())
+
+    # for name, param in model.named_parameters():
+    #     print(f"Layer: {name} | Size: {param.size()} | Values : {param[:2]} \n")
+    
+    
+    # print ("model.num_hidden_neurons", model.num_hidden_neurons)
+    # print ("type(model.num_hidden_neurons)", type(model.num_hidden_neurons))
+
+    loss_fn = nn.MSELoss() 
+    
+    # optimizer_grad = torch.optim.Adam(model.parameters(),lr=1e-3)
+    # for epoc in range(epochs):
+    #     backprop(train_sample_array, train_label_array, model, loss_fn, optimizer_grad)
+
+    # rmse_temp = test_loop_return(val_sample_array, val_label_array, model, loss_fn)
+    # print ("rmse_temp", rmse_temp)
+
+
+    optimizer= pseudoInverse(params=model.parameters(), C=l2_parm, forgettingfactor=1 ,L =10, device=device)
+
+    # validation_lst = []
+    # for t in range(epochs):
+    #     print(f"Epoch {t+1}\n-------------------------------")
+    #     train_loop(train_sample_array, train_label_array, model, loss_fn, optimizer)
+    #     test_loop(val_sample_array, val_label_array, model, loss_fn)
+    # print("Done!")
+
+
+    train_loop(train_sample_array, train_label_array, model, loss_fn, optimizer)
+
+    rmse = train_loop_return(val_sample_array, val_label_array, model, loss_fn)
+    val_net = (rmse,)
+
+    return val_net
+
+
+def test_net(model,  val_sample_array, val_label_array, l2_parm, epochs, device):
     '''
     specify the optimizers and train the network
     :param epochs:
@@ -347,7 +465,7 @@ def train_net(model, train_sample_array, train_label_array, val_sample_array, va
     # print ("rmse_temp", rmse_temp)
 
 
-    optimizer= pseudoInverse(params=model.parameters(), C=l2_parm, forgettingfactor=1 ,L =10, device=device)
+    # optimizer= pseudoInverse(params=model.parameters(), C=l2_parm, forgettingfactor=1 ,L =10, device=device)
 
     # validation_lst = []
     # for t in range(epochs):
@@ -357,16 +475,15 @@ def train_net(model, train_sample_array, train_label_array, val_sample_array, va
     # print("Done!")
 
 
-    train_loop(train_sample_array, train_label_array, model, loss_fn, optimizer)
+    # train_loop(train_sample_array, train_label_array, model, loss_fn, optimizer)
 
-    rmse = test_loop_return(val_sample_array, val_label_array, model, loss_fn)
+    rmse, score = test_loop_return(val_sample_array, val_label_array, model, loss_fn)
     val_net = (rmse,)
 
-    return val_net
+    return val_net, score
 
 
-
-def test_net(model, test_sample_array, test_label_array):
+def test_engine(model, test_sample_array, test_label_array):
     ''''''
 
     model.eval()

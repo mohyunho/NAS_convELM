@@ -279,8 +279,8 @@ def main():
     # torch.backends.cudnn.benchmark = False
     # torch.manual_seed(seed)
     # torch.cuda.manual_seed_all(seed)
-    # np.random.seed(seed)
-    # random.seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
 
 
 
@@ -388,8 +388,8 @@ def main():
             'mut_gene_probability': 0.3  # 0.1
         }
 
-        mutate_log_path = os.path.join(directory_path, 'mute_log_ori_%s_%s_%s_%s.csv' % (pop_size, n_generations, obj, trial))
-        mutate_log_col = ['idx', 'params_1', 'params_2', 'params_3', 'params_4', 'params_5', 'fitness_1',
+        mutate_log_path = os.path.join(directory_path, 'mute_log_test_%s_%s_%s_%s.csv' % (pop_size, n_generations, obj, trial))
+        mutate_log_col = ['idx', 'params_1', 'params_2', 'params_3', 'params_4', 'params_5', 'params_6', 'params_7', 'fitness_1',
                           'gen']
         mutate_log_df = pd.DataFrame(columns=mutate_log_col, index=None)
         mutate_log_df.to_csv(mutate_log_path, index=False)
@@ -418,8 +418,8 @@ def main():
             'mut_gene_probability': 0.4  # 0.1
         }
         mutate_log_path = os.path.join(directory_path, 'mute_log_ori_%s_%s_%s_%s.csv' % (pop_size, n_generations, obj, trial ))
-        mutate_log_col = ['idx', 'params_1', 'params_2', 'params_3', 'params_4', 
-                          'fitness_1', 'fitness_2', 'hypervolume', 'gen']
+        mutate_log_col = ['idx', 'params_1', 'params_2', 'params_3', 'params_4', 'params_5', 'params_6', 'params_7', 'fitness_1',
+                          'gen']
         mutate_log_df = pd.DataFrame(columns=mutate_log_col, index=None)
         mutate_log_df.to_csv(mutate_log_path, index=False)
 
@@ -480,6 +480,7 @@ def main():
         jobs=jobs,
         log_function=log_function,
         cs = cs,
+        prft_path=prft_path,
         **other_args
     )
 

@@ -78,7 +78,7 @@ def main():
 
 
     for file in sorted(os.listdir(ea_log_path)):
-        if file.startswith("mute_log_ori_%s_%s_%s" %(pop, gen, obj)):
+        if file.startswith("mute_log_test_%s_%s_%s" %(pop, gen, obj)):
             print ("path1: ", file)
             mute_log_df = pd.read_csv(os.path.join(ea_log_path, file))
             results_lst.append(mute_log_df)
@@ -90,12 +90,13 @@ def main():
 
 
     for loop_idx in range(len(results_lst)):
+        print ("loop_idx", loop_idx)
         print ("file %s in progress..." %loop_idx)
         mute_log_df = results_lst[loop_idx]
 
         params_temp_lst =[]
         for idx, row in mute_log_df.iterrows():
-            num_params = 20* row["params_1"] * row["params_3"] * round(50/8)
+            num_params = int(50*row["params_7"]) 
             params_temp_lst.append(num_params)
 
         mute_log_df["params"] = params_temp_lst
@@ -143,10 +144,10 @@ def main():
     fig_verify.set_figheight(7)
     fig_verify.set_figwidth(5)
 
-    x_ref = range(1, gen + 1)
+    x_ref = range(0, gen + 1)
     plt.xticks(x_ref, fontsize=10, rotation=60)
 
-    ax2 = ax1.twinx()
+    # ax2 = ax1.twinx()
 
 
 
@@ -162,10 +163,12 @@ def main():
 
     print ("mean_params", mean_params)
 
+    print ("len(hv_trial_lst) ", len(hv_trial_lst) )
+
     if len(hv_trial_lst) == 1:    
         # plt.plot(x_ref, mean_hv, color='red', linewidth=1, label = 'Mean')
         ax1.plot(x_ref, mean_hv, color='red', linewidth=1, label = 'Validation RMSE')
-        ax2.plot(x_ref, mean_params, color='blue', linewidth=1, label = 'No. parameters')
+        # ax2.plot(x_ref, mean_params, color='blue', linewidth=1, label = 'No. parameters')
 
     else:
         plt.plot(x_ref, mean_hv, color='red', linewidth=1, label = 'Mean')
@@ -180,7 +183,7 @@ def main():
 
     ax1.set_xlabel('Generations')
     ax1.set_ylabel('Fitness', color='red')
-    ax2.set_ylabel('No. parameters', color='blue')
+    # ax2.set_ylabel('No. parameters', color='blue')
 
     
     plt.yticks(fontsize=11)
@@ -190,7 +193,7 @@ def main():
 
     # plt.legend(loc='upper right', fontsize=15)
     ax1.legend(loc=0)
-    ax2.legend(loc=0)
+    # ax2.legend(loc=0)
     fig_verify.savefig(os.path.join(pic_dir, 'fitness_plot_%s_%s.png' % (pop, gen)), dpi=1500,
                     bbox_inches='tight')
     fig_verify.savefig(os.path.join(pic_dir, 'fitness_plot_%s_%s.eps' % (pop, gen)), dpi=1500,

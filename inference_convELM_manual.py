@@ -45,7 +45,7 @@ from torch.autograd import Variable
 from utils.pseudoInverse import pseudoInverse
 
 from utils.convELM_network import ConvElm
-from utils.convELM_network import train_net, test_net
+from utils.convELM_network import train_net, test_net, test_engine
 
 # np.random.seed(0)
 # torch.cuda.manual_seed(0)
@@ -80,7 +80,6 @@ if not os.path.exists(directory_path):
 '''
 load array from npz files
 '''
-
 def array_tensorlst_data (arry, bs, device):
     # arry = arry.reshape(arry.shape[0],arry.shape[2],arry.shape[1])
 
@@ -117,6 +116,7 @@ def array_tensorlst_data (arry, bs, device):
     return train_batch_lst
 
 
+
 def array_tensorlst_label (arry, bs, device):
 
     if bs > arry.shape[0]:
@@ -143,7 +143,6 @@ def array_tensorlst_label (arry, bs, device):
         train_batch_lst.append(arr_tensor)
 
     return train_batch_lst
-
 
 def load_array (sample_dir_path, unit_num, win_len, stride):
     filename =  'Unit%s_win%s_str%s.npz' %(str(int(unit_num)), win_len, stride)
@@ -256,6 +255,14 @@ def main():
     # seed = trial
     seed = trial
 
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+
+
 
 
     ############ Prepare train data
@@ -311,18 +318,36 @@ def main():
     sample_array = []
     label_array = []
 
+    if bs > train_sample_array.shape[0]:
+        train_arry = array_tensorlst_data(train_sample_array, bs, device)[0]
+        label_arry = array_tensorlst_label(train_label_array, bs, device)[0]
+        train_sample_array = []
+        train_label_array = []
+        train_sample_array.append(train_arry)
+        train_label_array.append(label_arry)
+    else:
+        train_sample_array = array_tensorlst_data(train_sample_array, bs, device)
+        train_label_array = array_tensorlst_label(train_label_array, bs, device)
 
-    train_sample_array = array_tensorlst_data(train_sample_array, bs, device)[0]
-    val_sample_array = array_tensorlst_data(val_sample_array, bs, device)[0]
-    train_label_array = array_tensorlst_label(train_label_array, bs, device)[0]
-    val_label_array = array_tensorlst_label(val_label_array, bs, device)[0]
+    if bs > val_sample_array.shape[0]:
+        train_arry = array_tensorlst_data(val_sample_array, bs, device)[0]
+        label_arry = array_tensorlst_label(val_label_array, bs, device)[0]
+        val_sample_array = []
+        val_label_array = []
 
-    bs = train_sample_array.shape[0]
+        val_sample_array.append(train_arry)
+        val_label_array.append(label_arry)
+    else:
+        val_sample_array = array_tensorlst_data(val_sample_array, bs, device)
+        val_label_array = array_tensorlst_label(val_label_array, bs, device)
+
+    bs = train_sample_array[0].shape[0]
+    print ("train_sample_array[0].shape", train_sample_array[0].shape)
 
     model_path = ""
     ##############
     # Read csv file of EA_log
-    mutate_log_path = os.path.join(directory_path, 'mute_log_ori_%s_%s_%s_%s.csv' % (pop_size, n_generations, obj, trial))
+    mutate_log_path = os.path.join(directory_path, 'mute_log_test_%s_%s_%s_%s.csv' % (pop_size, n_generations, obj, trial))
     ea_log_df = pd.read_csv(mutate_log_path)
     # Select HOF
     hof_df = ea_log_df.loc[ea_log_df["fitness_1"] == min(ea_log_df["fitness_1"].values)]
@@ -331,18 +356,21 @@ def main():
     hof_ind = hof_df.iloc[0]
 
     # Generated an optimized conv ELM
-    l2_parm = 1e-2
-    feat_len = train_sample_array.shape[1]
-    win_len = train_sample_array.shape[2]
+    l2_parm = 1e-3
+    feat_len = train_sample_array[0].shape[1]
+    win_len = train_sample_array[0].shape[2]
     conv1_ch_mul = hof_ind["params_1"]
     conv1_kernel_size = hof_ind["params_2"]
     conv2_ch_mul = hof_ind["params_3"]
     conv2_kernel_size = hof_ind["params_4"]
-    conv3_ch_mul = 1
-    conv3_kernel_size = hof_ind["params_5"]
+    conv3_ch_mul = hof_ind["params_5"]
+    conv3_kernel_size = hof_ind["params_6"]
+    fc_mul = hof_ind["params_7"]
 
     print ("hof_ind", hof_ind)
-    convELM_model = ConvElm(feat_len, win_len, conv1_ch_mul, conv1_kernel_size, conv2_ch_mul, conv2_kernel_size, conv3_ch_mul, conv3_kernel_size, l2_parm, model_path).to(device)
+    convELM_model = ConvElm(feat_len, win_len, conv1_ch_mul, conv1_kernel_size, conv2_ch_mul, conv2_kernel_size, conv3_ch_mul, conv3_kernel_size, fc_mul, l2_parm, model_path).to(device)
+
+
 
     # print("convELM_model", convELM_model)
     print(f"Model structure: {convELM_model}\n\n")
@@ -368,9 +396,20 @@ def main():
         sample_array = sample_array[::sub]
         label_array = label_array[::sub]
 
-        test_sample_array = array_tensorlst_data(sample_array, bs, device)[0]
-        test_label_array = array_tensorlst_label(label_array, bs, device)[0]
-        y_pred_test, label_array = test_net(convELM_model, test_sample_array, test_label_array)
+        if bs > sample_array.shape[0]:
+            train_arry = array_tensorlst_data(sample_array, bs, device)[0]
+            label_arry = array_tensorlst_label(label_array, bs, device)[0]
+            test_sample_array = []
+            test_label_array = []
+            test_sample_array.append(train_arry)
+            test_label_array.append(label_arry)
+        else:
+            test_sample_array = array_tensorlst_data(sample_array, bs, device)
+            test_label_array = array_tensorlst_label(label_array, bs, device)
+
+        # test_sample_array = array_tensorlst_data(sample_array, bs, device)[0]
+        # test_label_array = array_tensorlst_label(label_array, bs, device)[0]
+        y_pred_test, label_array = test_engine(convELM_model, test_sample_array[0], test_label_array[0])
         output_lst.append(y_pred_test)
         truth_lst.append(label_array)
 

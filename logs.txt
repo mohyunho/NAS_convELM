@@ -50,6 +50,69 @@ python3 inference_mlp.py -w 50 -s 50 -bs 128 -ep 30 -pt 5 -vs 0.2 -lr 0.001 -sub
 ------------------------------------
 #####################################
 
+
+lr 1e-3
+bs 256
+
+factor 30
+elm-gd tau 0.3656565656565657
+elm-gd p_value 7.030439733513323e-08
+elm-gd rho 0.5154587516670767
+elm-gd p 4.070161285003725e-08
+elm-test tau 0.2448484848484849
+elm-test p_value 0.0003068143283946876
+elm-test rho 0.3646366236304221
+elm-test p 0.00019163700990455567
+
+factor 50
+elm-gd tau 0.4593939393939395
+elm-gd p_value 1.2680567977439835e-11
+elm-gd rho 0.6452204284269849
+elm-gd p 4.291113113199339e-13
+elm-test tau 0.3482828282828283
+elm-test p_value 2.8323620188052127e-07
+elm-test rho 0.4917728317775251
+elm-test p 2.037141398265074e-07
+gd-test tau 0.5187878787878789
+gd-test p_value 2.0444064706303235e-14
+gd-test rho 0.686484897066029
+gd-test p 3.1816151258192667e-15
+score-test tau 0.47232323232323237
+score-test p_value 3.33487487600819e-12
+score-test rho 0.6496185017865429
+score-test p 2.636993619997626e-13
+
+
+factor 70
+elm-gd tau 0.4153535353535354
+elm-gd p_value 9.182501591423879e-10
+elm-gd rho 0.5758688666485902
+elm-gd p 3.6519780251433346e-10
+elm-test tau 0.29131313131313136
+elm-test p_value 1.7513135653324297e-05
+elm-test rho 0.4294291320863413
+elm-test p 8.260271820307032e-06
+
+
+factor 100
+elm-gd tau 0.355959595959596
+elm-gd p_value 1.5422576410012672e-07
+elm-gd rho 0.5039576569801315
+elm-gd p 9.033159842541567e-08
+elm-test tau 0.3361616161616162
+elm-test p_value 7.211249297618376e-07
+elm-test rho 0.4856052400248695
+elm-test p 3.038309845471984e-07
+
+
+
+
+
+
+
+
+############
+
 python3 -W ignore enas_convELM.py -w 50 -s 1 -vs 0.2 --pop 20 --gen 20 -bs 1024 --obj "soo" -t 0
 
 python3 -W ignore enas_convELM.py -w 50 -s 50 -vs 0.2 --pop 20 --gen 20 -bs 5012 --obj "soo" -t 2
@@ -65,3 +128,156 @@ python3 -W ignore template_convELM.py -w 50 -s 50 -vs 0.2 --pop 20 --gen 20 -bs 
 
 
 python3 -W ignore enas_convELM.py -w 50 -s 50 -vs 0.2 -ep 200 --pop 20 --gen 20 -bs 256 --obj "soo" -t 2
+
+python3 rank_corr.py --pop 100 --gen 0 -t 1
+
+python3 rank_corr_test.py --pop 100 --gen 0 -t 4
+
+python3 -W ignore enas_convELM.py -w 50 -s 50 -vs 0.2 -ep 50 --pop 100 --gen 0 -bs 256 --obj "soo" -t 1
+
+python3 -W ignore enas_convELM.py -w 50 -s 50 -vs 0.2 -ep 100 --pop 100 --gen 0 -bs 256 --obj "soo" -t 4
+
+python3 test_elm_log.py -w 50 -s 50 -bs 256 -ep 50 -t 4 --pop 100 --gen 0 
+
+python3 test_score_log.py -w 50 -s 50 -bs 256 -ep 50 -t 4 --pop 100 --gen 0 
+
+python3 -W ignore enas_convELM.py -w 50 -s 50 -vs 0.2 -ep 100 --pop 100 --gen 0 -bs 256 --obj "soo" -t 4
+python3 test_score_log.py -w 50 -s 50 -bs 256 -ep 50 -t 4 --pop 100 --gen 0 
+python3 rank_corr_test.py --pop 100 --gen 0 -t 4
+
+
+NCMAPSS
+python3 -W ignore enas_convELM.py -w 50 -s 50 -vs 0.2 -ep 100 --pop 20 --gen 20 -bs 50000000000 --obj "soo" -t 4
+[10.3, 10.3, 10.3, 10.3, 10.3, 10.3, 10.3, 10.3, 10.71, 10.71, 10.86, 10.86, 10.86, 10.86, 10.3, 10.86, 10.81, 10.71, 11.65, 12.52]
+min: 10.3, max:12.52, avg:10.705500000000002
+20      8       [10.7055]       [0.53827015]    [10.3]  [12.52]
+pickle dump
+log saved
+Best individual:
+[19, 8, 12, 14, 11, 20, 41]
+[[10, 5, 4, 20, 9, 18, 46]]
+Best individual is saved
+EA time:  59.11510396003723
+####################  EA COMP
+
+min: 10.3, max:12.52, avg:10.705500000000002
+20      8       [10.7055]       [0.53827015]    [10.3]  [12.52]
+pickle dump
+log saved
+Best individual:
+[19, 8, 12, 14, 11, 20, 41]
+[[10, 5, 4, 20, 9, 18, 46]]
+Best individual is saved
+EA time:  59.498440980911255
+####################  EA COMPLETE / HOF TEST   ##############################
+
+CMAPSS
+
+python3 -W ignore enas_convELM_CMAPSS.py -w 50 -s 50 -vs 0.2 -ep 50 --pop 100 --gen 0 -bs 256 --obj "soo" -t 1 --subdata 001
+
+python3 -W ignore enas_convELM_CMAPSS.py -w 30 -s 50 -vs 0.2 -ep 50 --pop 20 --gen 20 -bs 50000000 --obj "soo" -t 1 --subdata 001
+
+
+
+
+fd001 
+
+Initializing network...
+Validation RMSE:  15.46
+validation RMSE:  15.46
+Initializing network...
+Validation RMSE:  15.35
+Test RMSE:  15.35
+
+Validation RMSE:  16.06
+validation RMSE:  16.06
+Initializing network...
+Validation RMSE:  15.91
+Test RMSE:  15.91
+
+
+fd002
+Initializing network...
+Validation RMSE:  44.19
+Test RMSE:  44.19
+
+Initializing network...
+Validation RMSE:  25.8
+validation RMSE:  25.8
+Initializing network...
+Validation RMSE:  34.09
+Test RMSE:  34.09
+
+0.0001
+Initializing network...
+Validation RMSE:  29.63
+validation RMSE:  29.63
+Initializing network...
+Validation RMSE:  36.24
+Test RMSE:  36.24
+
+0.001
+Initializing network...
+Validation RMSE:  28.97
+validation RMSE:  28.97
+Initializing network...
+Validation RMSE:  38.26
+Test RMSE:  38.26
+
+fd003
+
+
+Initializing network...
+Validation RMSE:  10.46
+validation RMSE:  10.46
+Initializing network...
+Validation RMSE:  17.57
+Test RMSE:  17.57
+
+Initializing network...
+Validation RMSE:  15.13
+validation RMSE:  15.13
+Initializing network...
+Validation RMSE:  16.76
+Test RMSE:  16.76
+
+0.0001
+Initializing network...
+Validation RMSE:  14.42
+validation RMSE:  14.42
+Initializing network...
+Validation RMSE:  16.24
+Test RMSE:  16.24
+
+
+fd004
+*100
+Initializing network...
+Validation RMSE:  29.13
+validation RMSE:  29.13
+Initializing network...
+Validation RMSE:  40.91
+Test RMSE:  40.91
+
+0.0001
+Initializing network...
+Validation RMSE:  29.95
+validation RMSE:  29.95
+Initializing network...
+Validation RMSE:  40.44
+Test RMSE:  40.44
+
+Initializing network...
+Validation RMSE:  28.4
+validation RMSE:  28.4
+Initializing network...
+Validation RMSE:  39.62
+Test RMSE:  39.62
+
+python3 -W ignore enas_convELM_CMAPSS.py -w 30 -s 50 -vs 0.2 -ep 50 -lr 0.0001 --pop 20 --gen 20 -bs 50000000 --obj "soo" -t 0 --subdata 001
+
+python3 -W ignore enas_convELM_CMAPSS.py -w 30 -s 50 -vs 0.2 -ep 50  --pop 20 --gen 20 -bs 50000000 --obj "nsga2" -t 0 --subdata 001
+
+python3 -W ignore enas_convELM_CMAPSS.py -w 19 -s 50 -vs 0.2 -ep 50 -lr 0.0001 --pop 20 --gen 20 -bs 50000000 --obj "soo" -t 4 --subdata 002
+
+python3 -W ignore enas_convELM_CMAPSS.py -w 21 -s 1 -vs 0.2 -ep 50  --pop 20 --gen 20 -bs 50000000 --obj "nsga2" -t 1 --subdata 002

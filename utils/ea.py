@@ -169,6 +169,8 @@ def eaSimple(population, toolbox, cxpb, mutpb, ngen, cs, stats=None,
     if verbose:
         print(logbook.stream)
 
+    log_function(population, 0, cs)    
+
     # Begin the generational process
     for gen in range(1, ngen + 1):
         # Select the next generation individuals

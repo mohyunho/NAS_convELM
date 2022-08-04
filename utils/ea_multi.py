@@ -7,7 +7,6 @@ Date:
 import random
 import pathos
 import numpy as np
-from utils.elm_task import Task
 from functools import partial
 import array
 from deap import base, algorithms, creator, tools
@@ -17,6 +16,7 @@ import os
 import pandas as pd
 import copy
 
+from utils.convELM_task import Task
 
 # os.remove("logbook.pkl")
 
@@ -90,7 +90,7 @@ def varAnd(population, toolbox, cxpb, mutpb):
     return offspring, unmodified
 
 
-def eaSimple(population, toolbox, cxpb, mutpb, ngen, cs, sel_op, stats=None,
+def eaSimple(population, toolbox, cxpb, mutpb, ngen, sel_op, stats=None,
              halloffame=None, paretofront = None, verbose=__debug__, log_function=None, prft_path = None):
     """This algorithm reproduce the simplest evolutionary algorithm as
     presented in chapter 7 of [Back2000]_.
@@ -185,6 +185,12 @@ def eaSimple(population, toolbox, cxpb, mutpb, ngen, cs, sel_op, stats=None,
     if verbose:
         print(logbook.stream)
 
+    ####################
+    # Initial population log
+    gen = 0
+    population_temp = copy.deepcopy(population)
+    log_function(population_temp, gen)
+    ############à
 
     if sel_op == "nsga2":
         # Begin the generational process
@@ -219,9 +225,19 @@ def eaSimple(population, toolbox, cxpb, mutpb, ngen, cs, sel_op, stats=None,
                     redundant.append(ind)
                 else:
                     to_evaluate.append(ind)
+
             invalid_ind = to_evaluate
 
+            # Evaluate architecture scores
+            # Split 'invalid_ind' into 'good_ind' and 'bad_ind'
+
+            # Estimate and assign fitness (RMSE)  for bad_ind using look up table
+
+
+            # Evaluate fitness for good_ind
             fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
+
+            # Assign fitness
             for ind, fit in zip(invalid_ind, fitnesses):
                 ind.fitness.values = fit
                 individual_map[str(ind)] = fit
@@ -259,11 +275,11 @@ def eaSimple(population, toolbox, cxpb, mutpb, ngen, cs, sel_op, stats=None,
 
 
             # hv = hypervolume(paretofront, ref_point)
-            hv = hypervolume(paretofront_hv,[10.0, 4000.0])
+            hv = hypervolume(paretofront_hv,[50.0, 4000.0])
             print ("hv",hv)
 
             population_temp = copy.deepcopy(population)
-            log_function(population_temp, gen, cs, hv)
+            log_function(population_temp, gen, hv)
             # not_mutated = [population_temp[u] for u in unmodified]
             # if len(unmodified) > 0 and log_function is not None:
             #     # print ([population_temp[u] for u in unmodified])
@@ -350,7 +366,7 @@ def eaSimple(population, toolbox, cxpb, mutpb, ngen, cs, sel_op, stats=None,
                     population[o.parents[argmin]] = o
 
             population_temp = copy.deepcopy(population)
-            log_function(population_temp, gen, cs)
+            log_function(population_temp, gen)
             # not_mutated = [population_temp[u] for u in unmodified]
             # if len(unmodified) > 0 and log_function is not None:
             #     # print ([population_temp[u] for u in unmodified])
@@ -373,9 +389,6 @@ def eaSimple(population, toolbox, cxpb, mutpb, ngen, cs, sel_op, stats=None,
             logbook.record(gen=gen, nevals=len(invalid_ind), **record)
             if verbose:
                 print(logbook.stream)
-
-
-
 
 
 
@@ -404,7 +417,7 @@ def checkBounds(bounds):
 class GeneticAlgorithm:
     def __init__(self, task: Task, population_size: int, n_generations: int, cx_probability: float,
                  mut_probability: float, crossover_operator: str = "one_point", mutation_operator: str = "uniform",
-                 selection_operator: str = "best", seed=None, jobs=1, log_function=None, cs = 0.0001, prft_path = None, **kwargs):
+                 selection_operator: str = "best", seed=None, jobs=1, log_function=None, prft_path = None, **kwargs):
         """
         Initializes an instance of the genetic algorithm.
         Parameters:
@@ -463,7 +476,6 @@ class GeneticAlgorithm:
         self.jobs = jobs
         self.kwargs = kwargs
         self.log_function = log_function
-        self.cs = cs
         self.prft_path = prft_path
         self._initialize_deap()
 
@@ -590,7 +602,6 @@ class GeneticAlgorithm:
             cxpb=self.cx_probability,
             mutpb=self.mut_probability,
             ngen=self.n_generations,
-            cs=self.cs,
             sel_op = self.selection_operator,
             stats=stats,
             halloffame=hof,
