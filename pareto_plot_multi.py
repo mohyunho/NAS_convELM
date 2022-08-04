@@ -37,10 +37,12 @@ import matplotlib.pyplot as plt
 import matplotlib.figure
 import matplotlib.backends.backend_agg as agg
 import matplotlib.backends.backend_svg as svg
+from matplotlib.ticker import FormatStrFormatter
+
 
 pop_size = 20
 n_generations = 20
-subdata = "001"
+subdata = "004"
 
 
 col_fit1 = "val_rmse"
@@ -228,23 +230,44 @@ def get_cmap(n, name='hsv'):
     return plt.cm.get_cmap(name, n)
 
 
+prft_all = pd.concat(prft_trial_lst)
 
-x_max = 25
-x_min = 15
-y_max = 4000
+val_rmse_max = prft_all[col_fit1].max()
+val_rmse_min = prft_all[col_fit1].min()
+
+
+num_max = prft_all[col_fit2].max()
+
+
+x_max = math.ceil(val_rmse_max)
+x_min = math.floor(val_rmse_min)
+
+y_max = (math.ceil(num_max/100.0)+1)*100
 y_min = 0
-x_sp = 0.5
-y_sp = 200
+
+x_sp = (x_max - x_min)/20.0
+y_sp = (y_max - y_min)/20.0
+
 spacing_x = x_sp
 spacing_y = y_sp
+
+
+
+# x_max = 25
+# x_min = 15
+# y_max = 4000
+# y_min = 0
+# x_sp = 0.5
+# y_sp = 200
+# spacing_x = x_sp
+# spacing_y = y_sp
 
 
 ############################### Histogram
 
 # Define any condition here
 fit_hist_array = np.zeros(int((x_max - x_min)/x_sp)*int((y_max - y_min)/y_sp))
-# print (prft_trial_lst[0])
-prft_all = pd.concat(prft_trial_lst)
+
 x_bin = []
 y_bin = []
 print (prft_all)
@@ -296,8 +319,13 @@ rect = matplotlib.patches.Rectangle((x_bin[max_idx],y_bin[max_idx]), x_sp, y_sp,
 #                                     edgecolor=  (1.0,0.9,0.1), zorder=1)
 ax.add_patch(rect)
 x_range = np.arange(x_min, x_max + x_sp, x_sp)
-ax.set_xticks(x_range)
+ax.set_xticks(x_range, minor=False)
 ax.set_xticklabels(x_range, rotation=60)
+ax.xaxis.set_major_formatter(FormatStrFormatter('%0.1f'))
+
+
+
+
 ax.set_yticks(
     np.arange(y_min, y_max + y_sp, spacing_y))
 # ax.set_xticklabels(np.arange(round(min(data[col_a]), 1)-0.2, round(max(data[col_a]), 1)+0.2, spacing_x), rotation=60)
@@ -312,7 +340,7 @@ ax.set_ylabel('Trainable parameters', fontsize=15)
 ax.legend(fontsize=11)
 # ax.set_rasterized(True)
 fig.savefig(os.path.join(pic_dir, 'prft_aggr_%s_%s_%s.png' % (pop_size, n_generations, subdata)), dpi=1500, bbox_inches='tight')
-# fig.savefig(os.path.join(pic_dir, 'prft_aggr_%s_%s_%s.eps' % (pop_size, n_generations, subdata)), dpi=1500, bbox_inches='tight')
+fig.savefig(os.path.join(pic_dir, 'prft_aggr_%s_%s_%s.eps' % (pop_size, n_generations, subdata)), dpi=1500, bbox_inches='tight')
 # fig.savefig(os.path.join(pic_dir, 'prft_aggr_%s_%s_%s.pdf' % (pop_size, n_generations, subdata)), dpi=1500, bbox_inches='tight')
 
 fig_verify = plt.figure(figsize=(6, 4))
@@ -339,11 +367,28 @@ fig_verify.savefig(os.path.join(pic_dir, 'hist_%s_%s_%s.png' % (pop_size, n_gene
 elm_selected_df = pd.read_csv(os.path.join(ea_log_path, "elm_selected_ind_%s_%s_%s.csv" %(pop_size, n_generations, subdata)))
 
 
+if subdata == "001":
+    mlp_solution = [37.36, 801]
+    cnn_solution = [18.45, 6815]
+    lstm_solution  = [16.14, 14681]
+elif subdata == "002":
+    mlp_solution = [80.03, 801]
+    cnn_solution = [30.29, 6815]
+    lstm_solution  = [24.49, 14681]
+elif subdata == "003":
+    mlp_solution = [37.39, 801]
+    cnn_solution = [19.82, 6815]
+    lstm_solution  = [16.18, 14681]
+elif subdata == "004":
+    mlp_solution = [77.37, 801]
+    cnn_solution = [29.16, 6815]
+    lstm_solution  = [28.17, 14681]
 
-mlp_solution = [37.36, 801]
-cnn_solution = [18.45, 6815]
-lstm_solution  = [16.14, 14681]
-hrs_ref = 3600
+
+
+
+
+x_max_compare = math.ceil(mlp_solution[0]) + 1
 
 
 selected_prft = prft_all.loc[(prft_all[col_fit1] > x_bin[max_idx]) & (prft_all[col_fit1] < x_bin[max_idx] + x_sp)
@@ -382,11 +427,14 @@ ax.scatter(selected_prft["test_rmse"].mean(), selected_prft["num_neuron"].mean()
 
 tickfontsize = 6
 
-x_range = np.arange(x_min, 41, x_sp*2)
-ax.set_xticks(x_range)
-ax.set_xticklabels(x_range,  fontsize=tickfontsize, rotation=60)
+# x_range = np.arange(x_min, x_max_compare, x_sp*2)
+x_range = np.arange(x_min, x_max_compare, (x_max_compare- x_min)/30.0)
 
-ax.set_xlim(x_min,41)
+
+ax.set_xticks(x_range, minor=False)
+ax.set_xticklabels(x_range,  fontsize=tickfontsize, rotation=60)
+ax.xaxis.set_major_formatter(FormatStrFormatter('%0.1f'))
+ax.set_xlim(x_min-x_sp,x_max_compare)
 # ax.set_ylim(0,6000)
 # ax.set_title("Solutions and pareto front", fontsize=15)
 
@@ -397,7 +445,7 @@ ax.set_xlim(x_min,41)
 # log = lambda x: np.log100(x)
 
 ax.set_yscale('linear')
-ax.set_ylim((0, 8500))
+ax.set_ylim((0-y_sp, 8500))
 
 y_range = np.arange(0, 8500, 500)
 ax.set_yticks(y_range)
