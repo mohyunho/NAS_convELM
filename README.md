@@ -1,2 +1,2 @@
 # NAS_convELM
-Optimization of convolutional ELM for remaining useful life prediction 
+Evolutionary optimization of convolutional ELM for remaining useful life prediction 
