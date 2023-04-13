@@ -21,7 +21,7 @@ python3 enas_convELM_CMAPSS.py
 
 Our experimental results on the CMAPSS dataset are shown as below: (a) FD001, (b) FD002, (c) FD003, and (d) FD004.<br/>
 <p align="center">
-  <img height="300" src="/conv_elm_results.png">
+  <img height="500" src="/conv_elm_results.png">
 </p>
 
 
